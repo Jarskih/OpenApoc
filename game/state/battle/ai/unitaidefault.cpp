@@ -120,7 +120,7 @@ std::tuple<AIDecision, bool> UnitAIDefault::think(GameState &state, BattleUnit &
 							for (auto &enemy : enemies)
 							{
 								// Do not auto-target harmless things
-								if (!enemy->isConscious() || enemy->getAIType() == AIType::None)
+								if (!enemy->isConscious() || enemy->getAIType() == AIType::None || enemy->getAIType() == AIType::Civilian)
 								{
 									continue;
 								}
@@ -183,7 +183,7 @@ std::tuple<AIDecision, bool> UnitAIDefault::think(GameState &state, BattleUnit &
 							for (auto &enemy : enemies)
 							{
 								// Do not auto-target harmless things
-								if (!enemy->isConscious() || enemy->getAIType() == AIType::None)
+								if (!enemy->isConscious() || enemy->getAIType() == AIType::None || enemy->getAIType() == AIType::Civilian)
 								{
 									continue;
 								}
