@@ -2995,7 +2995,7 @@ void Battle::exitBattle(GameState &state)
 			StateRef<Vehicle> location = {&state, state.current_battle->mission_location_id};
 			city = location->city;
 
-			for (auto &v : state.vehicles)
+			for (auto &v : state.vehicles.getMap())
 			{
 				// Check every player owned vehicle located in city
 				if (v.second->owner != player || v.second->city != city ||

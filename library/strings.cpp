@@ -145,5 +145,4 @@ bool Strings::isWhiteSpace(char32_t c)
 }
 
 UString Strings::fromU64(uint64_t i) { return format("%llu", i); }
-
 }; // namespace OpenApoc

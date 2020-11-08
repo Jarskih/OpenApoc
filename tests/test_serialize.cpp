@@ -173,7 +173,7 @@ int main(int argc, char **argv)
 		LogInfo("Using vehicle map for \"%s\"", vType->name);
 		v->type = {state.get(), vType};
 		v->name = OpenApoc::format("%s %d", v->type->name, ++v->type->numCreated);
-		state->vehicles[vID] = v;
+		state->vehicles.addItem(vID, v);
 
 		OpenApoc::StateRef<OpenApoc::Vehicle> enemyVehicle = {state.get(), vID};
 		OpenApoc::StateRef<OpenApoc::Vehicle> playerVehicle = {};

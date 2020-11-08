@@ -204,7 +204,7 @@ void AgentAssignment::updateLocation()
 				agents.emplace_back(a.second);
 			}
 		}
-		for (auto &v : state->vehicles)
+		for (auto &v : state->vehicles.getMap())
 		{
 			if (v.second->owner == state->getPlayer() && v.second->currentBuilding == building)
 			{
@@ -240,7 +240,7 @@ void AgentAssignment::updateLocation()
 				agents.emplace_back(a.second);
 			}
 		}
-		for (auto &v : state->vehicles)
+		for (auto &v : state->vehicles.getMap())
 		{
 			if (v.second->owner == state->getPlayer())
 			{
@@ -657,7 +657,7 @@ std::list<StateRef<Vehicle>> AgentAssignment::getSelectedVehicles() const
 	}
 
 	std::list<StateRef<Vehicle>> vehicles;
-	for (auto &v : state->vehicles)
+	for (auto &v : state->vehicles.getMap())
 	{
 		if (vehicleControlSet.find(v.second) != vehicleControlSet.end())
 		{

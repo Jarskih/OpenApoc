@@ -389,7 +389,7 @@ void TransferScreen::closeScreen()
 				bool ferryFound = false;
 				for (auto &o : ferryCompanies)
 				{
-					for (auto &v : state->vehicles)
+					for (auto &v : state->vehicles.getMap())
 					{
 						if (v.second->owner != o ||
 						    (!v.second->type->provideFreightCargo &&

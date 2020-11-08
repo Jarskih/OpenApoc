@@ -60,7 +60,7 @@ GameState::~GameState()
 	{
 		a.second->destroy();
 	}
-	for (auto &v : this->vehicles)
+	for (auto &v : this->vehicles.getMap())
 	{
 		auto vehicle = v.second;
 		vehicle->removeFromMap(*this);
@@ -181,7 +181,7 @@ void GameState::initState()
 			}
 		}
 		// Add vehicles to map
-		for (auto &v : this->vehicles)
+		for (auto &v : this->vehicles.getMap())
 		{
 			auto vehicle = v.second;
 			if (vehicle->city == city && !vehicle->currentBuilding && !vehicle->betweenDimensions)
@@ -775,7 +775,7 @@ void GameState::invasion()
 	// Set a list of possible participants
 	std::map<UString, int> vehicleLimits;
 	std::map<UString, std::list<sp<Vehicle>>> invaders;
-	for (auto &v : vehicles)
+	for (auto &v : vehicles.getMap())
 	{
 		if (v.second->owner == invadingOrg && v.second->city == invadingCity)
 		{
@@ -921,7 +921,7 @@ bool GameState::canTurbo() const
 	{
 		return false;
 	}
-	for (auto &v : this->vehicles)
+	for (auto &v : this->vehicles.getMap())
 	{
 		if (!v.second->isDead() && v.second->city == this->current_city &&
 		    v.second->tileObject != nullptr)
@@ -1001,7 +1001,7 @@ void GameState::update(unsigned int ticks)
 			o.second->updateMissions(*this);
 		}
 
-		for (auto &v : this->vehicles)
+		for (auto &v : this->vehicles.getMap())
 		{
 			if (v.second->city == current_city)
 			{
@@ -1093,7 +1093,7 @@ void GameState::updateEndOfSecond()
 			}
 		}
 	}
-	for (auto &v : vehicles)
+	for (auto &v : vehicles.getMap())
 	{
 		if (v.second->city == current_city)
 		{
@@ -1347,7 +1347,7 @@ void GameState::updateTurbo()
 
 void GameState::updateAfterTurbo()
 {
-	for (auto &v : this->vehicles)
+	for (auto &v : this->vehicles.getMap())
 	{
 		if (v.second->city != current_city)
 		{

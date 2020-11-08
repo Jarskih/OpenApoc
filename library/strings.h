@@ -15,6 +15,7 @@ namespace OpenApoc
 // using ustring_view = std::basic_string_view<char8_t>;
 //#else
 //#warning Using char
+
 using UString = std::basic_string<char>;
 using UStringView = std::basic_string_view<char>;
 //#endif
@@ -43,7 +44,6 @@ using U32StringView = std::basic_string_view<char32_t>;
 
 class Strings
 {
-
   public:
 	[[nodiscard]] static bool isFloat(const UStringView s);
 	[[nodiscard]] static bool isInteger(const UStringView s);

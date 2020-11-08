@@ -11,6 +11,8 @@
 #include <list>
 #include <map>
 
+#include "library/observer.h"
+
 // Uncomment to allow projectiles to shoot down friendly projectiles
 //#define DEBUG_ALLOW_PROJECTILE_ON_PROJECTILE_FRIENDLY_FIRE
 
@@ -77,6 +79,7 @@ class Doodad;
 class TileMap;
 class Agent;
 class Collision;
+class Observable;
 
 class Cargo
 {
@@ -151,11 +154,17 @@ class VehicleMover
 
 class Vehicle : public StateObject<Vehicle>,
                 public std::enable_shared_from_this<Vehicle>,
-                public EquippableObject
+                public EquippableObject,
+                public Observable
 {
   public:
 	~Vehicle() override;
 	Vehicle() = default;
+
+	// The "attached" event occurs when the observer attached to an observable.
+	void attached(Observable *observable);
+	// The "detached" event occurs when the observer detached from the observable.
+	void detached();
 
 	enum class AttackMode
 	{

@@ -92,7 +92,7 @@ void Base::die(GameState &state, bool collapse)
 			}
 		}
 	}
-	for (auto &v : state.vehicles)
+	for (auto &v : state.vehicles.getMap())
 	{
 		for (auto &c : v.second->cargo)
 		{
@@ -432,7 +432,7 @@ int Base::getCapacityUsed(GameState &state, FacilityType::Capacity type) const
 	switch (type)
 	{
 		case FacilityType::Capacity::Repair:
-			for (auto &v : state.vehicles)
+			for (auto &v : state.vehicles.getMap())
 			{
 				if (v.second->homeBuilding == building &&
 				    v.second->getMaxHealth() > v.second->getHealth())

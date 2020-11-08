@@ -213,7 +213,7 @@ void TransactionScreen::populateControlsVehicle()
 			}
 		}
 	}
-	for (auto &v : state->vehicles)
+	for (auto &v : state->vehicles.getMap())
 	{
 		if (v.second->owner == state->getPlayer())
 		{
@@ -572,7 +572,7 @@ void TransactionScreen::displayItem(sp<TransactionControl> control)
 		}
 		case TransactionControl::Type::Vehicle:
 		{
-			VehicleSheet(formItemVehicle).display(state->vehicles[control->itemId]);
+			VehicleSheet(formItemVehicle).display(state->vehicles.getItem(control->itemId));
 			formItemVehicle->setVisible(true);
 			break;
 		}

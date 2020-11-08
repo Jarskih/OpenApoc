@@ -55,7 +55,7 @@ VEquipScreen::VEquipScreen(sp<GameState> state)
 		VehicleSheet(formVehicleItem).display(selected);
 	});
 
-	for (auto &v : state->vehicles)
+	for (auto &v : state->vehicles.getMap())
 	{
 		auto vehicle = v.second;
 		if (vehicle->owner != state->getPlayer())
@@ -100,7 +100,7 @@ void VEquipScreen::begin()
 
 	vehicleSelectBox = form->findControlTyped<ListBox>("VEHICLE_SELECT_BOX");
 
-	for (auto &v : state->vehicles)
+	for (auto &v : state->vehicles.getMap())
 	{
 		auto vehicle = v.second;
 		if (vehicle->owner != state->getPlayer())

@@ -103,7 +103,7 @@ Organisation::canPurchaseFrom(GameState &state, const StateRef<Building> &buyer,
 			bool ferryFound = false;
 			for (auto &o : ferryCompanies)
 			{
-				for (auto &v : state.vehicles)
+				for (auto &v : state.vehicles.getMap())
 				{
 					if (v.second->owner != o || !v.second->type->provideFreightCargo ||
 					    !v.second->missions.empty())
@@ -312,7 +312,7 @@ void Organisation::updateMissions(GameState &state)
 	}
 	// Find rescue-capable craft
 	StateRef<Vehicle> rescueTransport;
-	for (auto &v : state.vehicles)
+	for (auto &v : state.vehicles.getMap())
 	{
 		if (v.second->owner.id == id && v.second->missions.empty() &&
 		    v.second->type->canRescueCrashed)
@@ -325,13 +325,13 @@ void Organisation::updateMissions(GameState &state)
 	if (rescueTransport)
 	{
 		// Rescue owned
-		for (auto &v : state.vehicles)
+		for (auto &v : state.vehicles.getMap())
 		{
 			if (v.second->city == rescueTransport->city && v.second->owner.id == id &&
 			    VehicleMission::canRecoverVehicle(state, *rescueTransport, *v.second))
 			{
 				bool foundRescuer = false;
-				for (auto &r : state.vehicles)
+				for (auto &r : state.vehicles.getMap())
 				{
 					if (r.second->city == rescueTransport->city && r.second->type->canRescueCrashed)
 					{
@@ -358,14 +358,14 @@ void Organisation::updateMissions(GameState &state)
 			}
 		}
 		// Rescue allies but not aliens
-		for (auto &v : state.vehicles)
+		for (auto &v : state.vehicles.getMap())
 		{
 			if (v.second->city == rescueTransport->city && v.second->owner != state.getAliens() &&
 			    v.second->owner.id != id && isRelatedTo(v.second->owner) == Relation::Allied &&
 			    VehicleMission::canRecoverVehicle(state, *rescueTransport, *v.second))
 			{
 				bool foundRescuer = false;
-				for (auto &r : state.vehicles)
+				for (auto &r : state.vehicles.getMap())
 				{
 					if (r.second->city == rescueTransport->city && r.second->type->canRescueCrashed)
 					{
@@ -564,7 +564,7 @@ void Organisation::updateVehicleAgentPark(GameState &state)
 	for (auto &entry : vehiclePark)
 	{
 		int countVehicles = 0;
-		for (auto &v : state.vehicles)
+		for (auto &v : state.vehicles.getMap())
 		{
 			if (v.second->owner.id == id && v.second->type == entry.first)
 			{

@@ -694,7 +694,7 @@ sp<Vehicle> City::createVehicle(GameState &state, StateRef<VehicleType> type,
 	// Vehicle::equipDefaultEquipment uses the state reference from itself, so make sure the
 	// vehicle table has the entry before calling it
 	UString vID = Vehicle::generateObjectID(state);
-	state.vehicles[vID] = v;
+	state.vehicles.addItem(vID, v);
 
 	return v;
 }

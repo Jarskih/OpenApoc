@@ -541,7 +541,7 @@ VehicleMission *VehicleMission::arriveFromDimensionGate(GameState &state, Vehicl
 	mission->type = MissionType::ArriveFromDimensionGate;
 	// find max delay arrival and increment
 	int lastTicks = -DIMENSION_GATE_DELAY;
-	for (auto &v2 : state.vehicles)
+	for (auto &v2 : state.vehicles.getMap())
 	{
 		if (v2.second->city == v.city && v2.second->owner == v.owner)
 		{

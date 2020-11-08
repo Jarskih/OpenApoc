@@ -82,7 +82,7 @@ template <>
 const UString &StateObject<Vehicle>::getId(const GameState &state, const sp<Vehicle> ptr)
 {
 	static const UString emptyString = "";
-	for (auto &v : state.vehicles)
+	for (auto &v : state.vehicles.getMap())
 	{
 		if (v.second == ptr)
 			return v.first;
@@ -1260,6 +1260,10 @@ VehicleMover::~VehicleMover() = default;
 
 Vehicle::~Vehicle() = default;
 
+void Vehicle::attached(Observable *observable) {}
+
+void Vehicle::detached() {}
+
 void Vehicle::leaveDimensionGate(GameState &state)
 {
 	// No portals to leave from. return here
@@ -1828,7 +1832,7 @@ void Vehicle::die(GameState &state, bool silent, StateRef<Vehicle> attacker)
 		}
 	}
 	// Clear targets
-	for (auto &v : state.vehicles)
+	for (auto &v : state.vehicles.getMap())
 	{
 		for (auto &m : v.second->missions)
 		{
@@ -2636,7 +2640,7 @@ sp<TileObjectVehicle> Vehicle::findClosestEnemy(GameState &state, sp<TileObjectV
 	// Find the closest enemy within the firing arc
 	float closestEnemyRange = std::numeric_limits<float>::max();
 	sp<TileObjectVehicle> closestEnemy;
-	for (auto &pair : state.vehicles)
+	for (auto &pair : state.vehicles.getMap())
 	{
 		auto otherVehicle = pair.second;
 		if (otherVehicle.get() == this)
@@ -3741,8 +3745,8 @@ void Vehicle::nextFrame(int ticks)
 
 template <> sp<Vehicle> StateObject<Vehicle>::get(const GameState &state, const UString &id)
 {
-	auto it = state.vehicles.find(id);
-	if (it == state.vehicles.end())
+	auto it = state.vehicles.getMap().find(id);
+	if (it == state.vehicles.getMap().end())
 	{
 		LogError("No vehicle matching ID \"%s\"", id);
 		return nullptr;

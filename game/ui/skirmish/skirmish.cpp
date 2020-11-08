@@ -102,7 +102,7 @@ std::shared_future<void> loadBattleVehicle(bool hotseat, sp<VehicleType> vehicle
 		    v->type = {state, vehicle};
 		    v->name = format("%s %d", v->type->name, ++v->type->numCreated);
 
-		    state->vehicles[vID] = v;
+		    state->vehicles.addItem(vID, v);
 		    StateRef<Vehicle> ufo = {state, vID};
 		    ufo->owner = state->getAliens();
 		    ufo->city = playerBase->building->city;

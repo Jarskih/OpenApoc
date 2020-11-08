@@ -93,7 +93,7 @@ void BaseBuyScreen::eventOccurred(Event *e)
 				}
 				base->building->owner = state->getPlayer();
 				// Boot organisation's vehicles and agents
-				for (auto &v : state->vehicles)
+				for (auto &v : state->vehicles.getMap())
 				{
 					if (v.second->homeBuilding == base->building)
 					{

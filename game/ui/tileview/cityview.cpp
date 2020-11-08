@@ -1626,7 +1626,7 @@ void CityView::render()
 		{
 			static const Colour groundColor = {255, 255, 64, 255};
 			static const Colour flyingColor = {64, 255, 255, 255};
-			for (auto &pair : state->vehicles)
+			for (auto &pair : state->vehicles.getMap())
 			{
 				auto v = pair.second;
 				if (v->city != state->current_city)
@@ -1795,7 +1795,7 @@ void CityView::update()
 	// Switch dimension if new day in city and vehicles in alien dimension
 	if (day != state->gameTime.getDay())
 	{
-		for (auto &v : state->vehicles)
+		for (auto &v : state->vehicles.getMap())
 		{
 			if (state->current_city != v.second->city && v.second->owner == state->getPlayer())
 			{
@@ -1808,7 +1808,7 @@ void CityView::update()
 	if (state->current_city.id == "CITYMAP_ALIEN")
 	{
 		switchDimension = true;
-		for (auto &v : state->vehicles)
+		for (auto &v : state->vehicles.getMap())
 		{
 			if (state->current_city == v.second->city && v.second->owner == state->getPlayer())
 			{
@@ -1866,7 +1866,7 @@ void CityView::update()
 		{
 			vehiclesMIA.insert(i.vehicle);
 		}
-		for (auto &v : state->vehicles)
+		for (auto &v : state->vehicles.getMap())
 		{
 			auto vehicle = v.second;
 			if (vehicle->owner != state->getPlayer() || v.second->isDead())
@@ -2628,7 +2628,7 @@ void CityView::update()
 		{
 			vehiclesMIA.insert(i.vehicle);
 		}
-		for (auto &v : state->vehicles)
+		for (auto &v : state->vehicles.getMap())
 		{
 			auto vehicle = v.second;
 			if (!v.second->tileObject || v.second->city != state->current_city ||
@@ -2996,7 +2996,7 @@ bool CityView::handleKeyDown(Event *e)
 				case SDLK_x:
 				{
 					LogWarning("Crashing!");
-					for (auto &v : state->vehicles)
+					for (auto &v : state->vehicles.getMap())
 					{
 						if (v.second->currentBuilding || v.second->city != state->current_city ||
 						    v.second->crashed || v.second->falling || !v.second->tileObject)
@@ -3833,7 +3833,7 @@ bool CityView::handleGameStateEvent(Event *e)
 					item_name = game_state->agent_equipment[ev->topic->itemId]->name;
 					break;
 				case ResearchTopic::ItemType::Craft:
-					item_name = game_state->vehicles[ev->topic->itemId]->name;
+					item_name = game_state->vehicles.getItem(ev->topic->itemId)->name;
 					break;
 			}
 			setUpdateSpeed(CityUpdateSpeed::Pause);

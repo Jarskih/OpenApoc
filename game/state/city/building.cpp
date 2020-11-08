@@ -411,7 +411,7 @@ void Building::updateCargo(GameState &state)
 	// Step 04: Find if carrying capacity is satisfied by incoming ferries
 	if (!spaceNeeded.empty())
 	{
-		for (auto &v : state.vehicles)
+		for (auto &v : state.vehicles.getMap())
 		{
 			// Check if in this city
 			if (v.second->city != city)
@@ -537,7 +537,7 @@ void Building::updateCargo(GameState &state)
 	// Step 05: Order new ferries for remaining capacity
 	if (!spaceNeeded.empty())
 	{
-		for (auto &v : state.vehicles)
+		for (auto &v : state.vehicles.getMap())
 		{
 			// Check if in this city
 			if (v.second->city != city)

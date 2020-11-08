@@ -703,7 +703,7 @@ void CityTileView::render()
 				}
 			}
 			// Compile list of vehicle destinations and add to draw for those that are in buildings
-			for (auto &v : state.vehicles)
+			for (auto &v : state.vehicles.getMap())
 			{
 				if (v.second->owner != state.getPlayer() || v.second->city != state.current_city)
 				{

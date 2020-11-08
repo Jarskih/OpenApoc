@@ -5,6 +5,7 @@
 #include "game/state/gameeventtypes.h"
 #include "game/state/gametime.h"
 #include "game/state/luagamestate.h"
+#include "game/state/observablelinkedmap.h"
 #include "game/state/shared/agent.h"
 #include "game/state/stateobject.h"
 #include "library/sp.h"
@@ -80,7 +81,7 @@ class GameState : public std::enable_shared_from_this<GameState>
 	StateRefMap<UFOIncursion> ufo_incursions;
 	StateRefMap<Base> player_bases;
 	StateRefMap<City> cities;
-	StateRefMap<Vehicle> vehicles;
+	ObservableLinkedMap<Vehicle> vehicles;
 	std::set<UString> vehiclesDeathNote;
 	StateRefMap<UfopaediaCategory> ufopaedia;
 	ResearchState research;
