@@ -1697,6 +1697,18 @@ bool BattleUnit::applyDamage(GameState &state, int power, StateRef<DamageType> d
 		damage = randDamage050150(state.rng, power);
 	}
 
+	if (damageType->effectType == DamageType::EffectType::Psionic)
+	{
+		damage = power;
+		const int random = randBoundsExclusive(state.rng, 0, 100);
+		const int chance =
+		    getPsiAttackChance(damage, agent->modified_stats.psi_defence, PsiStatus::Panic);
+		if (random < chance)
+		{
+			agent->modified_stats.loseMorale(damage);
+		}
+	}
+
 	// Hit shield if present
 	if (!damageType->ignore_shield)
 	{
