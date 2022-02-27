@@ -24,6 +24,12 @@ set (GAMESTATE_SOURCE_FILES
 	battle/ai/unitaihelper.cpp
 	battle/ai/unitailowmorale.cpp
 	battle/ai/unitaivanilla.cpp
+	battle/ai/unitaigoap.cpp
+
+	battle/ai/goap/action.cpp
+	battle/ai/goap/worldState.cpp
+	battle/ai/goap/node.cpp
+	battle/ai/goap/planner.cpp
 
 	battle/battle.cpp
 	battle/battledoor.cpp

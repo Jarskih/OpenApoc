@@ -20,7 +20,8 @@ class UnitAI
 		Default,
 		Behavior,
 		Vanilla,
-		Hardcore
+		Hardcore,
+		GOAP
 	};
 	Type type; // cannot hide because serializer won't work
 	virtual ~UnitAI() = default;

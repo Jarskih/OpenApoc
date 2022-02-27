@@ -757,10 +757,14 @@ void Agent::addEquipment(GameState &state, Vec2<int> pos, sp<AEquipment> object)
 	object->equippedSlotType = slotType;
 	if (slotType == EquipmentSlotType::RightHand)
 	{
+		current_stats.gainPsiDefense(object->type->psi_defense_boost);
+		modified_stats.gainPsiDefense(object->type->psi_defense_boost);
 		rightHandItem = object;
 	}
 	if (slotType == EquipmentSlotType::LeftHand)
 	{
+		current_stats.gainPsiDefense(object->type->psi_defense_boost);
+		modified_stats.gainPsiDefense(object->type->psi_defense_boost);
 		leftHandItem = object;
 	}
 	this->equipment.emplace_back(object);
@@ -777,10 +781,14 @@ void Agent::removeEquipment(GameState &state, sp<AEquipment> object)
 	this->equipment.remove(object);
 	if (object->equippedSlotType == EquipmentSlotType::RightHand)
 	{
+		current_stats.losePsiDefense(object->type->psi_defense_boost, initial_stats.psi_defence);
+		modified_stats.losePsiDefense(object->type->psi_defense_boost, initial_stats.psi_defence);
 		rightHandItem = nullptr;
 	}
 	if (object->equippedSlotType == EquipmentSlotType::LeftHand)
 	{
+		current_stats.losePsiDefense(object->type->psi_defense_boost, initial_stats.psi_defence);
+		modified_stats.losePsiDefense(object->type->psi_defense_boost, initial_stats.psi_defence);
 		leftHandItem = nullptr;
 	}
 	if (unit)

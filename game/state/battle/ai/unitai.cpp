@@ -1,6 +1,8 @@
 #include "game/state/battle/ai/unitai.h"
+
 #include "game/state/battle/ai/unitaibehavior.h"
 #include "game/state/battle/ai/unitaidefault.h"
+#include "game/state/battle/ai/unitaigoap.h"
 #include "game/state/battle/ai/unitaihardcore.h"
 #include "game/state/battle/ai/unitailowmorale.h"
 #include "game/state/battle/ai/unitaivanilla.h"
@@ -27,6 +29,8 @@ const UString UnitAI::getName()
 			return "UnitAIVanilla";
 		case Type::Hardcore:
 			return "UnitAIHardcore";
+		case Type::GOAP:
+			return "UnityAIGOAP";
 	}
 	LogError("Unimplemented getName for Unit AI Type %d", (int)type);
 	return "";
@@ -36,6 +40,7 @@ void AIBlockUnit::init(GameState &state, BattleUnit &u)
 {
 	// FIXME: Actually read this option
 	bool USER_OPTION_USE_HARDCORE_AI = false;
+	bool USER_OPTION_USE_GOAP_AI = false;
 
 	aiList.clear();
 	aiList.push_back(mksp<UnitAILowMorale>());
@@ -48,7 +53,7 @@ void AIBlockUnit::init(GameState &state, BattleUnit &u)
 	}
 	else
 	{
-		aiList.push_back(mksp<UnitAIVanilla>());
+		aiList.push_back(mksp<UnitAIGoap>());
 	}
 
 	reset(state, u);
