@@ -3,6 +3,8 @@
 #include "game/state/battle/ai/goap/worldstate.h"
 #include "game/state/battle/ai/unitai.h"
 
+#define GOAP_AI_DEBUG_OUTPUT
+
 namespace OpenApoc
 {
 
@@ -17,6 +19,7 @@ class UnitAIGoap : public UnitAI
 	Action current_action;
 
 	const int has_weapon = 1;
+	const int has_grenade = 2;
 	const int target_acquired = 10;
 	const int target_lost = 15;
 	const int target_in_range = 20;
@@ -31,6 +34,7 @@ class UnitAIGoap : public UnitAI
 	virtual ~UnitAIGoap() = default;
 	static bool HasTarget(GameState &state, BattleUnit &u);
 	bool HasWeapon(GameState &state, const BattleUnit &battle_unit) const;
+	bool HasGrenade(GameState &state, const BattleUnit &u) const;
 	void UpdateWorldState(GameState &state, BattleUnit &u) const;
 	std::tuple<AIDecision, bool> think(GameState &state, BattleUnit &u, bool interrupt) override;
 };

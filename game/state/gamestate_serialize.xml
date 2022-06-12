@@ -1251,6 +1251,7 @@
 		<member>trigger_type</member>
 		<member>explosion_depletion_rate</member>
 		<member>spawnList</member>
+		<member>psi_defense_boost</member>
 	</object>
 	<object>
 		<name>VEquipmentType</name>
@@ -1845,6 +1846,9 @@
 		<value>Popper</value>
 		<value>Spawner</value>
 		<value>Loot</value>
+		<value>StatBoostInventory</value>
+		<value>StatBoostHand</value>
+		<value>Consumable</value>
 	</enum>
 	<enum>
 		<name>AgentType::Role</name>
@@ -1925,6 +1929,10 @@
 		<value>Strafing</value>
 		<value>Reverse</value>
 		<value>Brainsuck</value>
+	</enum>
+	<enum>
+		<name>StatType</name>
+		<value>PsiDefense</value>
 	</enum>
 	<enum>
 		<name>AIType</name>

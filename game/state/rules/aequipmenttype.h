@@ -60,7 +60,10 @@ class AEquipmentType : public StateObject<AEquipmentType>
 		Popper,
 		Spawner,
 		// For Psi-clones and stuff
-		Loot
+		Loot,
+		StatBoostInventory,
+		StatBoostHand,
+		Consumable
 	};
 
 	AEquipmentType() = default;
@@ -83,6 +86,9 @@ class AEquipmentType : public StateObject<AEquipmentType>
 	int armor = 0;
 	int score = 0;
 	ResearchDependency research_dependency;
+	// Boost psi Defense when equipped
+	int psi_defense_boost = 0;
+
 	// Whether item is carried two-handed (for display purposes)
 	bool two_handed = false;
 

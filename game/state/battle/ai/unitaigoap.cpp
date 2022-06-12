@@ -100,26 +100,25 @@ bool UnitAIGoap::HasWeapon(GameState &state, const BattleUnit &u) const
 		{
 			continue;
 		}
-		switch (e->type->type)
+		if (e->type->type == AEquipmentType::Type::Weapon)
 		{
-			case AEquipmentType::Type::Weapon:
-				return true;
-				break;
-			case AEquipmentType::Type::Grenade:
-				// Accept if no other grenade yet sighted
-				return true;
-				break;
-			case AEquipmentType::Type::MindBender:
-				return true;
-				break;
-			case AEquipmentType::Type::Brainsucker:
-				return true;
-				break;
-			case AEquipmentType::Type::Popper:
-				return true;
-				break;
-			default:
-				break;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool UnitAIGoap::HasGrenade(GameState &state, const BattleUnit &u) const
+{
+	for (auto &e : u.agent->equipment)
+	{
+		if (!e->canBeUsed(state))
+		{
+			continue;
+		}
+		if (e->type->type == AEquipmentType::Type::Grenade)
+		{
+			return true;
 		}
 	}
 	return false;
@@ -129,11 +128,13 @@ void UnitAIGoap::UpdateWorldState(GameState &state, BattleUnit &u) const
 {
 	world_state->setVariable(target_acquired, HasTarget(state, u));
 	world_state->setVariable(has_weapon, HasWeapon(state, u));
+	world_state->setVariable(has_grenade, HasGrenade(state, u));
 	world_state->setVariable(target_in_range, true);
 
 	std::cout << std::endl << u.agent->name << std::endl;
 	std::cout << "target_acquired " << world_state->getVariable(target_acquired) << std::endl;
 	std::cout << "has_weapon " << world_state->getVariable(has_weapon) << std::endl;
+	std::cout << "has_grenade " << world_state->getVariable(has_grenade) << std::endl;
 	std::cout << "target_in_range " << world_state->getVariable(target_in_range) << std::endl
 	          << std::endl;
 }
@@ -148,7 +149,7 @@ std::tuple<AIDecision, bool> UnitAIGoap::think(GameState &state, BattleUnit &u, 
 		case AIType::PanicFreeze:
 		case AIType::PanicRun:
 		case AIType::Berserk:
-			LogError("Calling UnitAIVanilla on panic/berserk unit!?");
+			LogError("Calling UnitAIGOAP on panic/berserk unit!?");
 			return {};
 		case AIType::Loner:
 		case AIType::Group:

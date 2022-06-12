@@ -321,7 +321,11 @@
       <key>AEQUIPMENTTYPE_MEGAPOL_SMOKE_GRENADE</key>
       <value>20</value>
     </entry>
-  </initial_base_agent_equipment>
+    <entry>
+      <key>AEQUIPMENTTYPE_MIND_SHIELD</key>
+      <value>20</value>
+    </entry>
+    </initial_base_agent_equipment>
   <initial_vehicles>
     <entry>
       <first>VEHICLETYPE_VALKYRIE_INTERCEPTOR</first>

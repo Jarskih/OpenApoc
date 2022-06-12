@@ -66,6 +66,11 @@ enum class MovementState
 	Brainsuck,
 };
 
+enum class StatType
+{
+	PsiDefense
+};
+
 class AgentStats
 {
   public:
@@ -101,6 +106,18 @@ class AgentStats
 		morale += value;
 		if (morale > 100)
 			morale = 100;
+	}
+	void losePsiDefense(int value, int initial_value)
+	{
+		psi_defence -= value;
+		if (psi_defence < initial_value)
+			psi_defence = initial_value;
+	}
+	void gainPsiDefense(int value)
+	{
+		psi_defence += value;
+		if (psi_defence > 100)
+			psi_defence = 100;
 	}
 	int psi_energy = 0;
 	int psi_attack = 0;
