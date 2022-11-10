@@ -1,13 +1,14 @@
 #pragma once
-#include "game/state/battle/ai/goap/planner.h"
 #include "game/state/battle/ai/goap/worldstate.h"
+#include "game/state/battle/ai/goap/action.h"
+#include "game/state/battle/ai/goap/planner.h"
 #include "game/state/battle/ai/unitai.h"
+
 
 #define GOAP_AI_DEBUG_OUTPUT
 
 namespace OpenApoc
 {
-
 class UnitAIGoap : public UnitAI
 {
 
@@ -15,27 +16,37 @@ class UnitAIGoap : public UnitAI
 	std::vector<sp<Action>> actions = std::vector<sp<Action>>();
 	sp<WorldState> world_state = nullptr;
 	sp<WorldState> goal_target = nullptr;
-	std::queue<Action> current_plan = std::queue<Action>();
-	Action current_action;
+	std::vector<sp<Action>> current_plan = std::vector<sp<Action>>();
+	sp<Action> current_action;
 
 	const int has_weapon = 1;
-	const int has_grenade = 2;
-	const int target_acquired = 10;
-	const int target_lost = 15;
-	const int target_in_range = 20;
-	const int target_dead = 30;
+	const int holding_grenade = 2;
+	const int target_visible = 3;
+	const int target_lost = 4;
+	const int target_in_range = 5;
+	const int target_dead = 6;
+	const int can_harm_target = 7;
+	const int suicider = 8;
+	const int low_on_health = 9;
+	const int is_healing = 10;
+	const int is_attacking = 11;
+	const int is_cloaked = 12;
+	const int is_conscious = 13;
+	const int is_fatally_wounded = 14;
+	const int holding_weapon = 2;
 
 	void CreateActions();
 	void CreateWorldState();
-	[[nodiscard]] std::queue<Action> Plan() const;
+	[[nodiscard]] std::vector<sp<Action>> Plan() const;
 
   public:
 	UnitAIGoap();
 	virtual ~UnitAIGoap() = default;
 	static bool HasTarget(GameState &state, BattleUnit &u);
 	bool HasWeapon(GameState &state, const BattleUnit &battle_unit) const;
-	bool HasGrenade(GameState &state, const BattleUnit &u) const;
+	bool HoldingItem(GameState &state, const BattleUnit &u, int type) const;
 	void UpdateWorldState(GameState &state, BattleUnit &u) const;
 	std::tuple<AIDecision, bool> think(GameState &state, BattleUnit &u, bool interrupt) override;
+	void Search();
 };
 } // namespace OpenApoc

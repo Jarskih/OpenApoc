@@ -88,7 +88,7 @@ class Planner
 	 stepwise-order
 	 @exception std::runtime_error if no plan could be made with the available actions and states
 	 */
-	std::queue<Action> plan(const sp<WorldState> &start, const sp<WorldState> &goal,
+	std::vector<sp<Action>> plan(const sp<WorldState> &start, const sp<WorldState> &goal,
 	                        const std::vector<sp<Action>> &actions);
 };
 } // namespace OpenApoc

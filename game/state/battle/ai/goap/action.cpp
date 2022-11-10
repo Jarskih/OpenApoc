@@ -38,7 +38,14 @@ WorldState Action::actOn(const WorldState &ws) const
 	return tmp;
 }
 
-void Action::act() {}
+void Action::setAction(std::function<void()> value)
+{
+	action = value;
+};
+
+void Action::act() const {
+	
+}
 
 bool Action::can_act() { return true; }
 } // namespace OpenApoc

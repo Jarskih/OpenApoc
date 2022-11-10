@@ -133,6 +133,7 @@ void dumpOptionsToLog()
 	dumpOption(optionBSKLauncherSound);
 	dumpOption(optionInvulnerableRoads);
 	dumpOption(optionATVTank);
+	dumpOption(optionGOAP);
 
 	dumpOption(optionATVAPC);
 
@@ -415,6 +416,9 @@ ConfigOptionBool optionATVAPC("OpenApoc.Mod", "ATVAPC", "(MOD) Wolfhound APC bec
 
 ConfigOptionBool optionCrashingVehicles("OpenApoc.Mod", "CrashingVehicles",
                                         "Vehicles crash on low HP", false);
+
+ConfigOptionBool optionGOAP("OpenApoc.Mod", "UseGOAP",
+                                   "Use Goal-Oriented Action Planning", false);
 
 ConfigOptionString optionScriptsList("OpenApoc.Mod", "ScriptsList",
                                      "Semicolon-separated list of scripts to load",

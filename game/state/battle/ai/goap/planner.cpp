@@ -61,14 +61,14 @@ void Planner::printClosedList() const
 	}
 }
 
-std::queue<Action> Planner::plan(const sp<WorldState> &start, const sp<WorldState> &goal,
+std::vector<sp<Action>> Planner::plan(const sp<WorldState> &start, const sp<WorldState> &goal,
                                  const std::vector<sp<Action>> &actions)
 {
 	if (start->meetsGoal(*goal))
 	{
 		throw std::runtime_error(
 		    "Planner cannot plan when the start state and the goal state are the same!");
-		return std::queue<Action>();
+		return std::vector<sp<Action>>();
 	}
 
 	// Feasible we'd re-use a planner, so clear out the prior results
@@ -100,10 +100,10 @@ std::queue<Action> Planner::plan(const sp<WorldState> &start, const sp<WorldStat
 		// Is our current state the goal state? If so, we've found a path, yay.
 		if (current.ws_.meetsGoal(*goal))
 		{
-			std::queue<Action> the_plan;
+			std::vector<sp<Action>> the_plan;
 			do
 			{
-				the_plan.push(*current.action_);
+				the_plan.emplace_back(current.action_);
 				auto itr = std::find_if(begin(open_), end(open_),
 				                        [&](const Node &n) { return n.id_ == current.parent_id_; });
 				if (itr == end(open_))

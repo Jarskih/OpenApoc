@@ -9,10 +9,10 @@
 #include "game/state/battle/battle.h"
 #include "game/state/battle/battleunit.h"
 #include "game/state/gamestate.h"
+#include "framework/configfile.h"
 
 namespace OpenApoc
 {
-
 static const uint64_t UNIT_AI_THINK_INTERVAL = TICKS_PER_SECOND / 8;
 
 const UString UnitAI::getName()
@@ -40,20 +40,25 @@ void AIBlockUnit::init(GameState &state, BattleUnit &u)
 {
 	// FIXME: Actually read this option
 	bool USER_OPTION_USE_HARDCORE_AI = false;
-	bool USER_OPTION_USE_GOAP_AI = false;
+	bool USER_OPTION_USE_GOAP_AI = config().getBool("OpenApoc.Mod.UseGOAP");
 
 	aiList.clear();
 	aiList.push_back(mksp<UnitAILowMorale>());
 	aiList.push_back(mksp<UnitAIDefault>());
-	aiList.push_back(mksp<UnitAIBehavior>());
+
 	// Even player units have AI because when they're taken control of they will need that
 	if (USER_OPTION_USE_HARDCORE_AI)
 	{
 		aiList.push_back(mksp<UnitAIHardcore>());
 	}
-	else
+
+	if (USER_OPTION_USE_GOAP_AI)
 	{
 		aiList.push_back(mksp<UnitAIGoap>());
+	}
+	else
+	{
+		aiList.push_back(mksp<UnitAIBehavior>());
 	}
 
 	reset(state, u);

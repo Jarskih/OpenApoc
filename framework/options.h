@@ -115,6 +115,7 @@ extern ConfigOptionBool optionATVTank;
 extern ConfigOptionBool optionATVAPC;
 
 extern ConfigOptionBool optionCrashingVehicles;
+extern ConfigOptionBool optionGOAP;
 
 extern ConfigOptionString optionScriptsList;
 

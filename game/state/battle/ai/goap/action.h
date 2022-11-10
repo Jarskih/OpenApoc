@@ -9,6 +9,10 @@
 #pragma once
 #include <string>
 #include <unordered_map>
+#include <functional>
+
+class GameState;
+class BattleUnit;
 
 namespace OpenApoc
 {
@@ -16,7 +20,7 @@ struct WorldState;
 
 class Action
 {
-  private:
+  protected:
 	std::string name_; // The human-readable action name
 	int cost_{};       // The numeric cost of this action
 
@@ -27,6 +31,8 @@ class Action
 	// Effects are things that happen when this action takes place.
 	std::unordered_map<int, bool> effects_;
 
+	std::function<void()> action;
+
   public:
 	Action() = default;
 	Action(std::string name, int cost);
@@ -36,7 +42,7 @@ class Action
 	 @param ws the worldstate in question
 	 @return true if this worldstate meets the preconditions
 	 */
-	[[nodiscard]] bool operableOn(const WorldState &ws) const;
+	[[nodiscard]] virtual bool operableOn(const WorldState &ws) const;
 
 	/**
 	 Act on the given worldstate. Will not check for "eligiblity" and will happily
@@ -44,7 +50,7 @@ class Action
 	 @param the worldstate to act on
 	 @return a copy worldstate, with effects applied
 	 */
-	[[nodiscard]] WorldState actOn(const WorldState &ws) const;
+	[[nodiscard]] virtual WorldState actOn(const WorldState &ws) const;
 
 	/**
 	 Set the given precondition variable and value.
@@ -60,10 +66,12 @@ class Action
 	 */
 	void setEffect(int key, bool value) { effects_[key] = value; }
 
+	void setAction(std::function<void()> value);
+
 	int cost() const { return cost_; }
 
 	[[nodiscard]] std::string name() const { return name_; }
-	void act();
+	void act() const;
 	bool can_act();
 };
 

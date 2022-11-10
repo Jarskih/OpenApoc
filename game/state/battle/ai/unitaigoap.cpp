@@ -21,35 +21,51 @@ UnitAIGoap::UnitAIGoap()
 
 void UnitAIGoap::CreateActions()
 {
-	auto attack = mksp<Action>("attack", 5);
-	attack->setPrecondition(target_in_range, true);
-	attack->setPrecondition(target_acquired, true);
-	attack->setPrecondition(has_weapon, true);
-	attack->setPrecondition(target_dead, false);
-	attack->setEffect(target_dead, true);
-	actions.push_back(attack);
+	// TODO get these from Lua script
 
-	auto spiral = mksp<Action>("searchSpiral", 5);
-	spiral->setPrecondition(target_acquired, false);
-	spiral->setPrecondition(target_lost, true);
-	spiral->setEffect(target_acquired, true);
-	actions.push_back(spiral);
+	auto search = mksp<Action>("search", 1);
+	search->setPrecondition(target_visible, false);
+	search->setEffect(target_visible, true);
+	actions.push_back(search);
 
-	auto serpentine = mksp<Action>("searchSerpentine", 5);
-	serpentine->setPrecondition(target_acquired, false);
-	serpentine->setPrecondition(target_lost, false);
-	serpentine->setEffect(target_acquired, true);
-	actions.push_back(serpentine);
-
-	auto intercept = mksp<Action>("interceptTarget", 5);
-	intercept->setPrecondition(target_acquired, true);
+	auto intercept = mksp<Action>("interceptTarget", 2);
+	intercept->setPrecondition(target_visible, true);
 	intercept->setPrecondition(target_dead, false);
+	intercept->setPrecondition(target_in_range, false);
 	intercept->setEffect(target_in_range, true);
 	actions.push_back(intercept);
 
-	auto detonateNearTarget = mksp<Action>("detonateNearTarget", 5);
+	auto takeGrenade = mksp<Action>("takeGrenade", 4);
+	intercept->setPrecondition(target_visible, true);
+	takeGrenade->setPrecondition(holding_grenade, false);
+	takeGrenade->setEffect(holding_grenade, true);
+	actions.push_back(takeGrenade);
+
+	auto throwGrenade = mksp<Action>("throwGrenade", 5);
+	intercept->setPrecondition(target_visible, true);
+	throwGrenade->setPrecondition(target_in_range, true);
+	throwGrenade->setPrecondition(holding_grenade, true);
+	throwGrenade->setPrecondition(target_dead, false);
+	throwGrenade->setEffect(target_dead, true);
+	actions.push_back(throwGrenade);
+
+	auto shoot = mksp<Action>("shoot", 5);
+	intercept->setPrecondition(target_visible, true);
+	shoot->setPrecondition(target_in_range, true);
+	shoot->setPrecondition(has_weapon, true);
+	shoot->setPrecondition(can_harm_target, true);
+	shoot->setPrecondition(target_dead, false);
+	shoot->setEffect(target_dead, true);
+	actions.push_back(shoot);
+
+	auto retreat = mksp<Action>("retreat", 3);
+	retreat->setPrecondition(low_on_health, true);
+	retreat->setPrecondition(target_visible, true);
+	actions.push_back(retreat);
+
+	auto detonateNearTarget = mksp<Action>("detonateNearTarget", 1);
+	detonateNearTarget->setPrecondition(suicider, true);
 	detonateNearTarget->setPrecondition(target_in_range, true);
-	detonateNearTarget->setPrecondition(target_acquired, true);
 	detonateNearTarget->setPrecondition(target_dead, false);
 	detonateNearTarget->setEffect(target_dead, true);
 	actions.push_back(detonateNearTarget);
@@ -59,10 +75,10 @@ void UnitAIGoap::CreateWorldState()
 {
 	// Here's the initial state...
 	world_state = mksp<WorldState>();
-	world_state->setVariable(target_acquired, false);
+	world_state->setVariable(target_visible, false);
 	world_state->setVariable(target_in_range, false);
 	world_state->setVariable(has_weapon, false);
-	world_state->setVariable(target_lost, true);
+	world_state->setVariable(target_lost, false);
 	world_state->setVariable(target_dead, false);
 
 	// ...and the goal state
@@ -71,24 +87,58 @@ void UnitAIGoap::CreateWorldState()
 	goal_target->priority_ = 50;
 }
 
-std::queue<Action> UnitAIGoap::Plan() const
+void UnitAIGoap::Search() {
+
+}
+
+std::vector<sp<Action>> UnitAIGoap::Plan() const
 {
 	try
 	{
-		std::queue<Action> the_plan = planner->plan(world_state, goal_target, actions);
+		std::vector<sp<Action>> the_plan = planner->plan(world_state, goal_target, actions);
 		std::cout << "Found a path!\n";
+		for (auto & item : the_plan)
+		{
+			std::cout << item->name() << std::endl;
+		}
 		return the_plan;
 	}
 	catch (const std::exception &)
 	{
 		std::cout << "Sorry, could not find a path!\n";
-		return std::queue<Action>();
+		return std::vector<sp<Action>>();
 	}
 }
 
 bool UnitAIGoap::HasTarget(GameState &state, BattleUnit &u)
 {
-	const auto hasTarget = !u.visibleEnemies.empty();
+	auto hasTarget = !u.visibleEnemies.empty();
+
+	for (auto &e : u.agent->equipment)
+	{
+		if (!e->canBeUsed(state))
+		{
+			continue;
+		}
+		if (e->type->type == AEquipmentType::Type::Brainsucker)
+		{
+			hasTarget = false;
+			for (auto &enemy : u.visibleEnemies)
+			{
+				if (enemy->agent->type->immuneToBrainsuckers)
+				{
+					continue;
+				}
+				hasTarget = true;
+				break;
+			}
+		}
+		else
+		{
+			return hasTarget;
+		}
+	}
+
 	return hasTarget;
 }
 
@@ -100,7 +150,7 @@ bool UnitAIGoap::HasWeapon(GameState &state, const BattleUnit &u) const
 		{
 			continue;
 		}
-		if (e->type->type == AEquipmentType::Type::Weapon)
+		if (e->type->type == AEquipmentType::Type::Weapon || e->type->type == AEquipmentType::Type::Brainsucker)
 		{
 			return true;
 		}
@@ -108,15 +158,18 @@ bool UnitAIGoap::HasWeapon(GameState &state, const BattleUnit &u) const
 	return false;
 }
 
-bool UnitAIGoap::HasGrenade(GameState &state, const BattleUnit &u) const
+bool UnitAIGoap::HoldingItem(GameState &state, const BattleUnit &u, int type) const
 {
-	for (auto &e : u.agent->equipment)
+	if (u.agent->leftHandItem != nullptr)
 	{
-		if (!e->canBeUsed(state))
+		if ((int)u.agent->leftHandItem->type->type == type)
 		{
-			continue;
+			return true;
 		}
-		if (e->type->type == AEquipmentType::Type::Grenade)
+	}
+	if (u.agent->rightHandItem != nullptr)
+	{
+		if ((int)u.agent->rightHandItem->type->type == type)
 		{
 			return true;
 		}
@@ -126,16 +179,27 @@ bool UnitAIGoap::HasGrenade(GameState &state, const BattleUnit &u) const
 
 void UnitAIGoap::UpdateWorldState(GameState &state, BattleUnit &u) const
 {
-	world_state->setVariable(target_acquired, HasTarget(state, u));
+	world_state->setVariable(target_visible, HasTarget(state, u));
 	world_state->setVariable(has_weapon, HasWeapon(state, u));
-	world_state->setVariable(has_grenade, HasGrenade(state, u));
-	world_state->setVariable(target_in_range, true);
+	world_state->setVariable(holding_grenade, HoldingItem(state, u, (int)AEquipmentType::Type::Grenade));
+	world_state->setVariable(holding_weapon,
+	            HoldingItem(state, u, (int)AEquipmentType::Type::Weapon));
+	world_state->setVariable(is_healing, u.isHealing);
+	world_state->setVariable(is_attacking, u.isAttacking());
+	world_state->setVariable(is_cloaked, u.isCloaked());
+	world_state->setVariable(is_conscious, u.isConscious());
+	world_state->setVariable(is_fatally_wounded, u.isFatallyWounded());
 
 	std::cout << std::endl << u.agent->name << std::endl;
-	std::cout << "target_acquired " << world_state->getVariable(target_acquired) << std::endl;
+	std::cout << "target_acquired " << world_state->getVariable(target_visible) << std::endl;
 	std::cout << "has_weapon " << world_state->getVariable(has_weapon) << std::endl;
-	std::cout << "has_grenade " << world_state->getVariable(has_grenade) << std::endl;
-	std::cout << "target_in_range " << world_state->getVariable(target_in_range) << std::endl
+	std::cout << "holding_weapon " << world_state->getVariable(holding_weapon) << std::endl;
+	std::cout << "holding_grenade " << world_state->getVariable(holding_grenade) << std::endl;
+	std::cout << "is_healing " << world_state->getVariable(is_healing) << std::endl;
+	std::cout << "is_attacking " << world_state->getVariable(is_attacking) << std::endl;
+	std::cout << "is_cloaked " << world_state->getVariable(is_cloaked) << std::endl;
+	std::cout << "is_conscious " << world_state->getVariable(is_conscious) << std::endl;
+	std::cout << "is_fatally_wounded " << world_state->getVariable(is_fatally_wounded) << std::endl
 	          << std::endl;
 }
 
@@ -164,8 +228,7 @@ std::tuple<AIDecision, bool> UnitAIGoap::think(GameState &state, BattleUnit &u, 
 		current_plan = Plan();
 		if (!current_plan.empty())
 		{
-			current_action = current_plan.front();
-			current_plan.pop();
+			current_action = current_plan.back();
 		}
 		else
 		{
@@ -175,15 +238,14 @@ std::tuple<AIDecision, bool> UnitAIGoap::think(GameState &state, BattleUnit &u, 
 		}
 	}
 
-	if (current_action.can_act() == false)
+	if (current_action->can_act() == false)
 	{
 		current_plan = Plan();
-		current_action = current_plan.front();
-		current_plan.pop();
+		current_action = current_plan.back();
 	}
 
-	std::cout << "current_action " << current_action.name() << std::endl;
-	current_action.act();
+	std::cout << "current_action " << current_action->name() << std::endl;
+	current_action->act();
 
 	AIDecision decision;
 	return std::make_tuple(decision, false);
