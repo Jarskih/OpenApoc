@@ -138,3 +138,5 @@ tools/extractors/docs/video.txt
 # CLion temp files
 .idea
 cmake-build-*
+
+vcpkg_installed
