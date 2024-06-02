@@ -19,6 +19,12 @@ class UnitAIGoap : public UnitAI
 	std::vector<sp<Action>> current_plan = std::vector<sp<Action>>();
 	sp<Action> current_action;
 
+	sp<GameState> state = nullptr;
+	sp<BattleUnit> unit = nullptr;
+
+	Vec3<int> targetLocation = {0, 0, 0};
+	Vec3<int> enemyPosition = {0, 0, 0};
+
 	const int has_weapon = 1;
 	const int holding_grenade = 2;
 	const int target_visible = 3;
@@ -40,7 +46,7 @@ class UnitAIGoap : public UnitAI
 	[[nodiscard]] std::vector<sp<Action>> Plan() const;
 
   public:
-	UnitAIGoap();
+	UnitAIGoap(GameState &state, BattleUnit &p_unit);
 	virtual ~UnitAIGoap() = default;
 	static bool HasTarget(GameState &state, BattleUnit &u);
 	bool HasWeapon(GameState &state, const BattleUnit &battle_unit) const;

@@ -43,18 +43,17 @@ void AIBlockUnit::init(GameState &state, BattleUnit &u)
 	bool USER_OPTION_USE_GOAP_AI = config().getBool("OpenApoc.Mod.UseGOAP");
 
 	aiList.clear();
-	aiList.push_back(mksp<UnitAILowMorale>());
-	aiList.push_back(mksp<UnitAIDefault>());
+	//aiList.push_back(mksp<UnitAILowMorale>());
+	//aiList.push_back(mksp<UnitAIDefault>());
 
 	// Even player units have AI because when they're taken control of they will need that
 	if (USER_OPTION_USE_HARDCORE_AI)
 	{
 		aiList.push_back(mksp<UnitAIHardcore>());
 	}
-
-	if (USER_OPTION_USE_GOAP_AI)
+	else if (USER_OPTION_USE_GOAP_AI)
 	{
-		aiList.push_back(mksp<UnitAIGoap>());
+		aiList.push_back(mksp<UnitAIGoap>(state, u));
 	}
 	else
 	{

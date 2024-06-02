@@ -6,17 +6,19 @@
 #include <iostream>
 #include <queue>
 #include <vector>
-
+#include <glm/glm.hpp>
 #include "game/state/rules/battle/damage.h"
 
 namespace OpenApoc
 {
 
-UnitAIGoap::UnitAIGoap()
+UnitAIGoap::UnitAIGoap(GameState &p_state, BattleUnit &p_unit)
 {
 	type = Type::GOAP;
 	CreateActions();
 	CreateWorldState();
+	state = p_state.shared_from_this();
+	unit = p_unit.shared_from_this();
 }
 
 void UnitAIGoap::CreateActions()
@@ -26,6 +28,7 @@ void UnitAIGoap::CreateActions()
 	auto search = mksp<Action>("search", 1);
 	search->setPrecondition(target_visible, false);
 	search->setEffect(target_visible, true);
+	search->setAction([this]() { Search(); });
 	actions.push_back(search);
 
 	auto intercept = mksp<Action>("interceptTarget", 2);
@@ -49,7 +52,7 @@ void UnitAIGoap::CreateActions()
 	throwGrenade->setEffect(target_dead, true);
 	actions.push_back(throwGrenade);
 
-	auto shoot = mksp<Action>("shoot", 5);
+	auto shoot = mksp<Action>("shoot", 3);
 	intercept->setPrecondition(target_visible, true);
 	shoot->setPrecondition(target_in_range, true);
 	shoot->setPrecondition(has_weapon, true);
@@ -88,7 +91,31 @@ void UnitAIGoap::CreateWorldState()
 }
 
 void UnitAIGoap::Search() {
+	int maxIterations = 50;
+	int iterationCount = 0;
 
+	if (targetLocation != Vec3<int>(0,0,0) && glm::distance(Vec3<float>(targetLocation), unit->position) > 1)
+	{
+		return;
+	}
+
+	while (iterationCount++ < maxIterations)
+	{
+		auto lbID = pickRandom(state->rng, state->current_battle->losBlockRandomizer);
+
+		targetLocation = state->current_battle->blockCenterPos[unit->getType()][lbID];
+		bool canRun = true;
+		if (!unit->agent->isMovementStateAllowed(MovementState::Running))
+		{
+			canRun = false;
+			break;
+		}
+		break;
+	}
+	std::cout << std::endl << "-------";
+	std::cout << "GAOP action: Search()" << std::endl;
+	std::cout << "targetLocation: " << targetLocation << std::endl;
+	std::cout << "-------" << std::endl;
 }
 
 std::vector<sp<Action>> UnitAIGoap::Plan() const
@@ -244,10 +271,24 @@ std::tuple<AIDecision, bool> UnitAIGoap::think(GameState &state, BattleUnit &u, 
 		current_action = current_plan.back();
 	}
 
+	std::cout << "----" << std::endl;
+	std::cout << u.agent->name << std::endl;
 	std::cout << "current_action " << current_action->name() << std::endl;
 	current_action->act();
 
-	AIDecision decision;
+	std::vector<sp<Action>> the_plan = planner->plan(world_state, goal_target, actions);
+	std::cout << std::endl;
+	std::cout << "current_plan" << std::endl;
+	for (auto &item : the_plan)
+	{
+		std::cout << item->name() << std::endl;
+	}
+	std::cout << "----" << std::endl;
+
+	AIDecision decision = {};
+	decision.movement->type = AIMovement::Type::Turn;
+	decision.movement->targetLocation = enemyPosition;
+	decision.action = current_action;
 	return std::make_tuple(decision, false);
 }
 
