@@ -817,7 +817,15 @@ void Building::detect(GameState &state, bool forced)
 	ticksDetectionTimeOut = TICKS_DETECTION_TIMEOUT;
 	if (base)
 	{
-		fw().pushEvent(new GameDefenseEvent(GameEventType::DefendTheBase, base, state.getAliens()));
+		if (!base->building->occupied())
+		{
+			base->die(state, false);
+		}
+		else
+		{
+			fw().pushEvent(
+			    new GameDefenseEvent(GameEventType::DefendTheBase, base, state.getAliens()));
+		}
 	}
 	else
 	{
@@ -960,7 +968,7 @@ void Building::alienMovement(GameState &state)
 	if (bld->base)
 	{
 		// Destroy base if its empty
-		if (bld->currentAgents.empty())
+		if (!bld->occupied())
 		{
 			bld->base->die(state, false);
 		}
@@ -977,11 +985,14 @@ void Building::underAttack(GameState &state, StateRef<Organisation> attacker)
 	if (owner->isRelatedTo(attacker) == Organisation::Relation::Hostile)
 	{
 		std::list<StateRef<Vehicle>> toLaunch;
-		for (auto v : currentVehicles)
+		for (auto &v : currentVehicles)
 		{
-			toLaunch.push_back(v);
+			if (v->canDefend())
+			{
+				toLaunch.push_back(v);
+			}
 		}
-		for (auto v : toLaunch)
+		for (auto &v : toLaunch)
 		{
 			v->setMission(state, VehicleMission::patrol(state, *v, true, 5));
 		}
@@ -1068,6 +1079,25 @@ int Building::getAverageConstitution() const
 		}
 	}
 	return (relevantTiles > 0) ? totalConst / relevantTiles : 0;
+}
+
+bool Building::occupied() const
+{
+	if (!this->currentAgents.empty())
+	{
+		return true;
+	}
+	if (!this->currentVehicles.empty())
+	{
+		for (auto &v : this->currentVehicles)
+		{
+			if (!v->currentAgents.empty())
+			{
+				return true;
+			}
+		}
+	}
+	return false;
 }
 
 bool Building::isAlive() const { return countActiveTiles() > 0; }

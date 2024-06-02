@@ -62,7 +62,6 @@ void ListBox::onRender()
 				{
 					case Orientation::Vertical:
 						ctrl->Size.x = (scroller_is_internal ? scroller->Location.x : this->Size.x);
-						ctrl->Size.y = ItemSize;
 						break;
 					case Orientation::Horizontal:
 						ctrl->Size.x = ItemSize;
@@ -202,15 +201,8 @@ void ListBox::update()
 		{
 			case Orientation::Vertical:
 			{
-				if (ItemSize == 0)
-				{
-					for (const auto &i : Controls)
-						scrollerLength += i->Size.y;
-				}
-				else
-				{
-					scrollerLength += Controls.size() * ItemSize;
-				}
+				for (const auto &i : Controls)
+					scrollerLength += i->Size.y;
 				scrollerLength = scrollerLength > Size.y ? scrollerLength - Size.y : 0;
 				break;
 			}
@@ -331,7 +323,7 @@ sp<Control> ListBox::removeItem(sp<Control> Item)
 	{
 		if (*i == Item)
 		{
-			Controls.erase(i);
+			Item->setRemoved();
 			resolveLocation();
 			Item->setParent(nullptr);
 			return Item;

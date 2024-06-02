@@ -209,7 +209,14 @@ void GameState::initState()
 		{
 			w->ammo_types.emplace(this, t.first);
 		}
+
+		// Fixing brainsucker pod store space for older saves
+		if (t.first == "AEQUIPMENTTYPE_BRAINSUCKER_POD")
+		{
+			t.second->store_space = 1;
+		}
 	}
+
 	for (auto &a : this->agent_types)
 	{
 		a.second->gravLiftSfx = battle_common_sample_list->gravlift;
@@ -519,8 +526,6 @@ void GameState::fillOrgStartingProperty()
 			    m.pattern.minIntervalRepeat / 2;
 		}
 	}
-
-	luaGameState.callHook("newGamePostInit", 0, 0);
 }
 
 void GameState::startGame()
@@ -630,6 +635,7 @@ void GameState::startGame()
 		buildingIt->second->current_crew[l.first] =
 		    randBoundsExclusive(rng, l.second.x, l.second.y);
 	}
+	buildingIt->second->initialInfiltration = true;
 
 	gameTime = GameTime::midday();
 
@@ -652,7 +658,7 @@ void GameState::fillPlayerStartingProperty()
 	std::vector<sp<Building>> buildingsWithBases;
 	for (auto &b : humanCity->buildings)
 	{
-		if (b.second->base_layout)
+		if (b.second->base_layout && !b.second->initialInfiltration)
 			buildingsWithBases.push_back(b.second);
 	}
 
@@ -717,7 +723,7 @@ void GameState::fillPlayerStartingProperty()
 		auto it = initial_agent_equipment.begin();
 		while (count > 0)
 		{
-			auto agent = this->agent_generator.createAgent(*this, this->getPlayer(), type);
+			auto agent = this->agent_generator.createInitAgent(*this, this->getPlayer(), type);
 			if (agent->type->canTrain)
 			{
 				agent->trainingAssignment = agent->initial_stats.psi_energy > 30
@@ -984,12 +990,24 @@ void OpenApoc::GameState::cleanUpDeathNote()
 			// Remove vehicle from selection
 			for (const auto &[cityId, city] : cities)
 			{
-				for (auto it = city->cityViewSelectedVehicles.begin();
-				     it != city->cityViewSelectedVehicles.end();)
+				for (auto it = city->cityViewSelectedOwnedVehicles.begin();
+				     it != city->cityViewSelectedOwnedVehicles.end();)
 				{
 					if (it->id == name)
 					{
-						it = city->cityViewSelectedVehicles.erase(it);
+						it = city->cityViewSelectedOwnedVehicles.erase(it);
+					}
+					else
+					{
+						++it;
+					}
+				}
+				for (auto it = city->cityViewSelectedOtherVehicles.begin();
+				     it != city->cityViewSelectedOtherVehicles.end();)
+				{
+					if (it->id == name)
+					{
+						it = city->cityViewSelectedOtherVehicles.erase(it);
 					}
 					else
 					{
@@ -1006,6 +1024,47 @@ void OpenApoc::GameState::cleanUpDeathNote()
 		for (auto &name : this->agentsDeathNote)
 		{
 			agents.erase(name);
+
+			// Remove from selection
+			for (const auto &[cityId, city] : cities)
+			{
+				for (auto it = city->cityViewSelectedBios.begin();
+				     it != city->cityViewSelectedBios.end();)
+				{
+					if (it->id == name)
+					{
+						it = city->cityViewSelectedBios.erase(it);
+					}
+					else
+					{
+						++it;
+					}
+				}
+				for (auto it = city->cityViewSelectedPhysics.begin();
+				     it != city->cityViewSelectedPhysics.end();)
+				{
+					if (it->id == name)
+					{
+						it = city->cityViewSelectedPhysics.erase(it);
+					}
+					else
+					{
+						++it;
+					}
+				}
+				for (auto it = city->cityViewSelectedEngineers.begin();
+				     it != city->cityViewSelectedEngineers.end();)
+				{
+					if (it->id == name)
+					{
+						it = city->cityViewSelectedEngineers.erase(it);
+					}
+					else
+					{
+						++it;
+					}
+				}
+			}
 		}
 		agentsDeathNote.clear();
 	}
@@ -1090,6 +1149,41 @@ void GameState::updateEndOfSecond()
 	for (auto &b : current_city->buildings)
 	{
 		b.second->updateCargo(*this);
+	}
+	for (auto &v : vehicles)
+	{
+		if (v.second->city == current_city)
+		{
+			v.second->updateEachSecond(*this);
+		}
+	}
+	for (auto &a : this->agents)
+	{
+		if (a.second->city == current_city)
+		{
+			a.second->updateEachSecond(*this);
+		}
+	}
+}
+
+void GameState::updateEndOfFiveMinutes()
+{
+	// TakeOver calculation stops when org is taken over
+	for (auto &o : this->organisations)
+	{
+		if (o.second->takenOver)
+		{
+			continue;
+		}
+		o.second->updateTakeOver(*this, TICKS_PER_MINUTE * 5);
+		if (o.second->takenOver)
+		{
+			break;
+		}
+	}
+
+	for (auto &b : current_city->buildings)
+	{
 		if (!b.second->base || b.second->owner != getPlayer())
 		{
 			continue;
@@ -1130,37 +1224,6 @@ void GameState::updateEndOfSecond()
 			}
 		}
 	}
-	for (auto &v : vehicles)
-	{
-		if (v.second->city == current_city)
-		{
-			v.second->updateEachSecond(*this);
-		}
-	}
-	for (auto &a : this->agents)
-	{
-		if (a.second->city == current_city)
-		{
-			a.second->updateEachSecond(*this);
-		}
-	}
-}
-
-void GameState::updateEndOfFiveMinutes()
-{
-	// TakeOver calculation stops when org is taken over
-	for (auto &o : this->organisations)
-	{
-		if (o.second->takenOver)
-		{
-			continue;
-		}
-		o.second->updateTakeOver(*this, TICKS_PER_MINUTE * 5);
-		if (o.second->takenOver)
-		{
-			break;
-		}
-	}
 
 	// Detection calculation stops when detection happens
 	for (auto &b : current_city->buildings)
@@ -1171,10 +1234,6 @@ void GameState::updateEndOfFiveMinutes()
 		{
 			break;
 		}
-	}
-	for (auto &b : current_city->buildings)
-	{
-		b.second->updateCargo(*this);
 	}
 }
 
@@ -1246,7 +1305,8 @@ void GameState::updateEndOfDay()
 
 	luaGameState.callHook("updateEndOfDay", 0, 0);
 	// Check if today is the first day of the week (monday).
-	// In that case, do not show the daily report as it's already part of the weekly report event
+	// In that case, do not show the daily report as it's already part of the weekly report
+	// event
 	if (this->gameTime.getMonthDay() != this->gameTime.getFirstDayOfCurrentWeek())
 		fw().pushEvent(new GameEvent(GameEventType::DailyReport));
 }
@@ -1595,6 +1655,10 @@ void GameState::logEvent(GameEvent *ev)
 		              gbe->base->building->bounds.p0.y + gbe->base->building->bounds.p1.y, 1) /
 		    2;
 	}
+	else if (GameSomethingDiedEvent *gsde = dynamic_cast<GameSomethingDiedEvent *>(ev))
+	{
+		location = gsde->location;
+	}
 	// TODO: Other event types
 	messages.emplace_back(EventMessage{gameTime, ev->message(), location});
 }
@@ -1664,5 +1728,4 @@ bool GameState::appendGameState(const UString &gamestatePath)
 	auto systemPath = fw().data->fs.resolvePath(gamestatePath);
 	return this->loadGame(systemPath);
 }
-
 }; // namespace OpenApoc

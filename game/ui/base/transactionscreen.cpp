@@ -38,16 +38,19 @@ TransactionScreen::TransactionScreen(sp<GameState> state, bool forceLimits)
 	formItemAgent = form->findControlTyped<Form>("AGENT_ITEM_VIEW");
 	formItemVehicle = form->findControlTyped<Form>("VEHICLE_ITEM_VIEW");
 	formAgentStats = form->findControlTyped<Form>("AGENT_STATS_VIEW");
+	formAgentProfile = form->findControlTyped<Form>("AGENT_PROFILE_VIEW");
 	formPersonnelStats = form->findControlTyped<Form>("PERSONNEL_STATS_VIEW");
 
 	formItemAgent->setVisible(false);
 	formItemVehicle->setVisible(false);
 	formAgentStats->setVisible(false);
 	formPersonnelStats->setVisible(false);
+	formAgentProfile->setVisible(false);
 
 	// Assign event handlers
 	onScrollChange = [this](FormsEvent *) { this->updateFormValues(); };
-	onHover = [this](FormsEvent *e) {
+	onHover = [this](FormsEvent *e)
+	{
 		auto tctrl = std::dynamic_pointer_cast<TransactionControl>(e->forms().RaisedBy);
 		if (!tctrl)
 		{
@@ -87,6 +90,7 @@ void TransactionScreen::setDisplayType(Type type)
 	formItemVehicle->setVisible(false);
 	formAgentStats->setVisible(false);
 	formPersonnelStats->setVisible(false);
+	formAgentProfile->setVisible(false);
 
 	form->findControlTyped<ScrollBar>("LIST_SCROLL")->setValue(0);
 	auto list = form->findControlTyped<ListBox>("LIST");
@@ -148,9 +152,15 @@ void TransactionScreen::setDisplayType(Type type)
 			viewHighlight = BaseGraphics::FacilityHighlight::Aliens;
 			break;
 	}
-	// Finally add all controls
+
+	// After all controls are loaded, check their visibility, and add them
 	for (auto &c : transactionControls[type])
 	{
+		// If control is not set to show, remove its visibility
+		if (c->isBio)
+		{
+			c->setVisible(c->tradeState.isActive());
+		}
 		list->addItem(c);
 	}
 	// Update display for bases
@@ -382,8 +392,11 @@ void TransactionScreen::populateControlsAlien()
 {
 	int leftIndex = getLeftIndex();
 	int rightIndex = getRightIndex();
+
 	for (auto &ae : state->agent_equipment)
 	{
+		const auto &alienTypeName = ae.first;
+
 		if (!ae.second->bioStorage)
 		{
 			continue;
@@ -391,16 +404,20 @@ void TransactionScreen::populateControlsAlien()
 		// Add alien
 		for (auto &b : state->player_bases)
 		{
-			if (b.second->inventoryBioEquipment[ae.first] > 0)
+			const auto alienTypeControl = findControlById(type, alienTypeName);
+
+			// Don't add an alien type if its count is zero or if it's already added in transaction
+			// controls
+			if (b.second->inventoryBioEquipment[ae.first] == 0 || alienTypeControl)
+				continue;
+
+			auto control = TransactionControl::createControl(
+			    *state, StateRef<AEquipmentType>{state.get(), ae.first}, leftIndex, rightIndex);
+			if (control)
 			{
-				auto control = TransactionControl::createControl(
-				    *state, StateRef<AEquipmentType>{state.get(), ae.first}, leftIndex, rightIndex);
-				if (control)
-				{
-					control->addCallback(FormEventType::ScrollBarChange, onScrollChange);
-					control->addCallback(FormEventType::MouseMove, onHover);
-					transactionControls[type].push_back(control);
-				}
+				control->addCallback(FormEventType::ScrollBarChange, onScrollChange);
+				control->addCallback(FormEventType::MouseMove, onHover);
+				transactionControls[type].push_back(control);
 			}
 		}
 	}
@@ -476,12 +493,12 @@ void TransactionScreen::updateBaseHighlight()
 			facilityPic->setVisible(true);
 			facilityPic->setImage(state->facility_types["FACILITYTYPE_LIVING_QUARTERS"]->sprite);
 			form->findControlTyped<Graphic>("FACILITY_FIRST_BAR")->setVisible(true);
-			int usage =
+			const auto usage =
 			    state->current_base->getUsage(*state, FacilityType::Capacity::Quarters, lqDelta);
 			fillBaseBar(true, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%d%%", usage));
+			facilityLabel->setText(format("%.f%%", usage));
 			break;
 		}
 		case BaseGraphics::FacilityHighlight::Stores:
@@ -490,12 +507,12 @@ void TransactionScreen::updateBaseHighlight()
 			facilityPic->setVisible(true);
 			facilityPic->setImage(state->facility_types["FACILITYTYPE_STORES"]->sprite);
 			form->findControlTyped<Graphic>("FACILITY_FIRST_BAR")->setVisible(true);
-			int usage =
+			const auto usage =
 			    state->current_base->getUsage(*state, FacilityType::Capacity::Stores, cargoDelta);
 			fillBaseBar(true, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%d%%", usage));
+			facilityLabel->setText(format("%.f%%", usage));
 			break;
 		}
 		case BaseGraphics::FacilityHighlight::Aliens:
@@ -504,12 +521,12 @@ void TransactionScreen::updateBaseHighlight()
 			facilityPic->setVisible(true);
 			facilityPic->setImage(state->facility_types["FACILITYTYPE_ALIEN_CONTAINMENT"]->sprite);
 			form->findControlTyped<Graphic>("FACILITY_FIRST_BAR")->setVisible(true);
-			int usage =
+			const auto usage =
 			    state->current_base->getUsage(*state, FacilityType::Capacity::Aliens, bioDelta);
 			fillBaseBar(true, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_FIRST_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%d%%", usage));
+			facilityLabel->setText(format("%.f%%", usage));
 			break;
 		}
 		default:
@@ -750,9 +767,9 @@ sp<TransactionControl> TransactionScreen::findControlById(const UString &itemId)
 		auto it = transactionControls.find(type);
 		if (it != transactionControls.end())
 		{
-			auto it2 = std::find_if(
-			    it->second.begin(), it->second.end(),
-			    [itemId](const sp<TransactionControl> &c) { return c->itemId == itemId; });
+			auto it2 = std::find_if(it->second.begin(), it->second.end(),
+			                        [itemId](const sp<TransactionControl> &c)
+			                        { return c->itemId == itemId; });
 			if (it2 != it->second.end())
 			{
 				return *it2;

@@ -487,7 +487,7 @@ void InitialGameStateExtractor::extractAgentEquipment(GameState &state) const
 		}
 
 		// Mark brainsucker launcher
-		if (edata.sprite_idx == 44)
+		if (edata.sprite_idx == IT_BRAINSUCKERLAUNCHER)
 		{
 			e->launcher = true;
 		}
@@ -741,7 +741,18 @@ void InitialGameStateExtractor::extractAgentEquipment(GameState &state) const
 
 		e->manufacturer = {&state, data_u.getOrgId(edata.manufacturer)};
 
-		e->store_space = edata.store_space;
+		switch (edata.sprite_idx)
+		{
+			// Fix store space for brainsucker pod
+			// It is set as 16 from edata when it should be 1
+			case IT_BRAINSUCKERPOD:
+				e->store_space = 1;
+				break;
+			default:
+				e->store_space = edata.store_space;
+				break;
+		}
+
 		e->armor = edata.armor;
 		e->score = edata.score;
 

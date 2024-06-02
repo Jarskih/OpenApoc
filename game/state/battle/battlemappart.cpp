@@ -229,13 +229,15 @@ void BattleMapPart::ceaseDoorFunction()
 		type = alternative_type;
 	// Remove from door's map parts
 	wp<BattleMapPart> sft = shared_from_this();
-	door->mapParts.remove_if([sft](wp<BattleMapPart> p) {
-		auto swp = sft.lock();
-		auto sp = p.lock();
-		if (swp && sp)
-			return swp == sp;
-		return false;
-	});
+	door->mapParts.remove_if(
+	    [sft](wp<BattleMapPart> p)
+	    {
+		    auto swp = sft.lock();
+		    auto sp = p.lock();
+		    if (swp && sp)
+			    return swp == sp;
+		    return false;
+	    });
 	door.clear();
 }
 
@@ -1173,7 +1175,7 @@ void BattleMapPart::updateFalling(GameState &state, unsigned int ticks)
 	}
 
 	// Collision with this tile happens when map part moves from this tile to the next
-	if (newPosition.z < 0 || floorf(newPosition.z) != floorf(position.z))
+	if (floorf(newPosition.z) != floorf(position.z))
 	{
 		sp<BattleMapPart> rubble;
 		// we may kill a unit by applying fall damage, this will trigger a stance change which will
@@ -1235,6 +1237,17 @@ void BattleMapPart::updateFalling(GameState &state, unsigned int ticks)
 					break;
 			}
 		}
+
+		if (newPosition.z < 0)
+		{
+			// Do not let the tiles fall through the level 0 regardless of type or collisions
+			if (!destroyed)
+			{
+				LogError("Tile at %f, %f fell through the ground", position.x, position.y);
+			}
+			destroyed = true;
+		}
+
 		// Spawn smoke, more intense if we land here
 		{
 			StateRef<DamageType> dtSmoke = {&state, "DAMAGETYPE_SMOKE"};
@@ -1254,7 +1267,7 @@ void BattleMapPart::updateFalling(GameState &state, unsigned int ticks)
 				if (!rubble)
 				{
 					// If no rubble present - spawn rubble
-					auto rubble = mksp<BattleMapPart>();
+					rubble = mksp<BattleMapPart>();
 					Vec3<int> initialPosition = position;
 					rubble->damaged = true;
 					rubble->owner = owner;

@@ -367,6 +367,8 @@ class BattleUnit : public StateObject<BattleUnit>, public std::enable_shared_fro
 	void init(GameState &state);
 	// Clears all possible cases of circular refs
 	void destroy() override;
+	// Reload weapons before the battle begins
+	void reloadWeapons(GameState &state);
 
 	// Squad
 
@@ -837,5 +839,10 @@ class BattleUnit : public StateObject<BattleUnit>, public std::enable_shared_fro
 	                       StateRef<BattleUnit> targetUnit = StateRef<BattleUnit>());
 	// Update both this unit's vision and other unit's vision of this unit
 	void refreshUnitVisibilityAndVision(GameState &state);
+
+	// Increment mission count if agent survives battle
+	void completedMission();
+	// Increment agent kill count
+	void recordKill();
 };
 } // namespace OpenApoc

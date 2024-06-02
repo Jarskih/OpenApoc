@@ -213,6 +213,39 @@ bool BattleUnit::isFatallyWounded()
 	return false;
 }
 
+void BattleUnit::reloadWeapons(GameState &state)
+{
+	// FIXME: Only reload player agents?
+	if (agent->owner == state.getPlayer())
+	{
+		auto weaponRight = agent->getFirstItemInSlot(EquipmentSlotType::RightHand);
+		auto weaponLeft = agent->getFirstItemInSlot(EquipmentSlotType::LeftHand);
+		if (weaponRight)
+		{
+
+			if (weaponRight->needsReload())
+			{
+				weaponRight->loadAmmo(state);
+			}
+			else
+			{
+				weaponRight->lastLoadedAmmoType = weaponRight->payloadType;
+			}
+		}
+		if (weaponLeft)
+		{
+			if (weaponLeft->needsReload())
+			{
+				weaponLeft->loadAmmo(state);
+			}
+			else
+			{
+				weaponLeft->lastLoadedAmmoType = weaponLeft->payloadType;
+			}
+		}
+	}
+}
+
 void BattleUnit::setPosition(GameState &state, const Vec3<float> &pos, bool goal)
 {
 	auto oldPosition = position;
@@ -659,6 +692,7 @@ void BattleUnit::refreshUnitVision(GameState &state, bool forceBlind,
 			battle.visibleUnits[owner].insert(vu);
 			if (owner == state.current_battle->currentPlayer &&
 			    owner->isRelatedTo(vu->owner) == Organisation::Relation::Hostile &&
+			    vu->owner != state.getCivilian() &&
 			    (battle.lastVisibleTime[owner].find(vu) == battle.lastVisibleTime[owner].end() ||
 			     battle.lastVisibleTime[owner][vu] + TICKS_SUPPRESS_SPOTTED_MESSAGES <= ticks))
 			{
@@ -668,7 +702,7 @@ void BattleUnit::refreshUnitVision(GameState &state, bool forceBlind,
 		}
 		// battle and units's visible enemies list (Do not count civilians as enemy)
 		if (owner->isRelatedTo(vu->owner) == Organisation::Relation::Hostile &&
-		    vu->getAIType() != AIType::Civilian)
+		    vu->owner != state.getCivilian())
 		{
 			visibleEnemies.insert(vu);
 			battle.visibleEnemies[owner].insert(vu);
@@ -1930,7 +1964,8 @@ void BattleUnit::update(GameState &state, unsigned int ticks)
 
 	// Update Items
 	bool updatedShield = false;
-	for (auto &item : agent->equipment)
+	auto equipmentCopy = agent->equipment;
+	for (auto &item : equipmentCopy)
 	{
 		if (item->type->type == AEquipmentType::Type::DisruptorShield &&
 		    item->ammo < item->getPayloadType()->max_ammo)
@@ -2357,8 +2392,8 @@ void BattleUnit::updateEvents(GameState &state)
 	{
 		// our target has a priority over others if enemy
 		auto lastSeenEnemyPosition =
-		    (targetUnit &&
-		     state.current_battle->visibleEnemies[owner].find(targetUnit) != visibleEnemies.end())
+		    (targetUnit && state.current_battle->visibleEnemies[owner].find(targetUnit) !=
+		                       state.current_battle->visibleEnemies[owner].end())
 		        ? targetUnit->position
 		        : (*visibleEnemies.begin())->position;
 
@@ -4656,6 +4691,10 @@ bool BattleUnit::useSpawner(GameState &state, const AEquipmentType &item)
 void BattleUnit::die(GameState &state, StateRef<BattleUnit> attacker, bool violently)
 {
 	auto attackerOrg = attacker ? attacker->agent->owner : nullptr;
+	if (attacker)
+	{
+		attacker->recordKill();
+	}
 	auto ourOrg = agent->owner;
 	bool destroy = false;
 	// Violent deaths (spawn stuff, blow up)
@@ -5927,4 +5966,21 @@ bool BattleUnit::addMission(GameState &state, BattleUnitMission *mission, bool t
 	}
 	return !mission->cancelled;
 }
+
+void BattleUnit::completedMission()
+{
+	if (agent)
+	{
+		agent->incrementMissionCount();
+	}
+}
+
+void BattleUnit::recordKill()
+{
+	if (agent)
+	{
+		agent->incrementKillCount();
+	}
+}
+
 } // namespace OpenApoc

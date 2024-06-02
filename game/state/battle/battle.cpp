@@ -14,6 +14,7 @@
 #include "game/state/city/base.h"
 #include "game/state/city/building.h"
 #include "game/state/city/city.h"
+#include "game/state/city/facility.h"
 #include "game/state/city/vehicle.h"
 #include "game/state/city/vehiclemission.h"
 #include "game/state/gameevent.h"
@@ -110,6 +111,7 @@ void Battle::initBattle(GameState &state, bool first)
 	common_image_list = state.battle_common_image_list;
 	common_sample_list = state.battle_common_sample_list;
 	loadResources(state);
+	saveMessages(state);
 	auto stt = shared_from_this();
 	for (auto &s : this->map_parts)
 	{
@@ -2503,6 +2505,11 @@ void Battle::enterBattle(GameState &state)
 	for (auto &u : state.current_battle->units)
 	{
 		u.second->updateCheckBeginFalling(state);
+		// Reload empty weapons at start of battle if needed
+		if (config().getBool("OpenApoc.NewFeature.AutoReload"))
+		{
+			u.second->reloadWeapons(state);
+		}
 	}
 
 	// Find first player unit
@@ -2530,6 +2537,10 @@ void Battle::enterBattle(GameState &state)
 
 	// Remember time
 	state.updateBeforeBattle();
+
+	// Clear selected units in case they die
+	state.current_city->cityViewSelectedSoldiers.clear();
+	state.current_city->cityViewSelectedCivilians.clear();
 }
 
 // To be called when battle must be finished and before showing score screen
@@ -2546,12 +2557,21 @@ void Battle::finishBattle(GameState &state)
 	state.current_battle->unloadResources(state);
 
 	// Remove active battle scanners and deactivate medikits and motion scanners
+	// and unprime any grenades or proximity mines
 	for (auto &u : state.current_battle->units)
 	{
 		for (auto &e : u.second->agent->equipment)
 		{
 			e->battleScanner.clear();
 			e->inUse = false;
+			e->primed = false;
+
+			// Recharge all equipment
+			auto payload = e->getPayloadType();
+			if (payload && payload->recharge && e->ammo < payload->max_ammo)
+			{
+				e->ammo = payload->max_ammo;
+			}
 		}
 	}
 
@@ -2664,14 +2684,20 @@ void Battle::finishBattle(GameState &state)
 	// - give him alien remains
 	if (state.current_battle->playerWon && !state.current_battle->winnerHasRetreated)
 	{
-		bool playerHasBioStorage = state.current_battle->player_craft &&
-		                           state.current_battle->player_craft->getMaxBio() > 0;
+		const auto playerHasBaseAlienStorage =
+		    isBaseDefenseWithStorage(state, FacilityType::Capacity::Aliens);
+
+		const auto playerHasCraftBioStorage = state.current_battle->player_craft &&
+		                                      state.current_battle->player_craft->getMaxBio() > 0;
+
+		const auto playerHasAlienStorage = playerHasCraftBioStorage || playerHasBaseAlienStorage;
+
 		// Live alien loot
 		for (auto &u : liveAliens)
 		{
 			if (u->agent->type->liveSpeciesItem)
 			{
-				if (playerHasBioStorage)
+				if (playerHasAlienStorage)
 				{
 					state.current_battle->score.liveAlienCaptured +=
 					    u->agent->type->liveSpeciesItem->score;
@@ -2850,6 +2876,7 @@ void Battle::finishBattle(GameState &state)
 			continue;
 		}
 		u.second->processExperience(state);
+		u.second->completedMission();
 		unitsByRating[-u.second->combatRating].push_back(u.second);
 	}
 	// Create count of ranks
@@ -2933,6 +2960,8 @@ void Battle::exitBattle(GameState &state)
 		LogError("Battle::ExitBattle called with no battle!");
 		return;
 	}
+	// Load cityscape messages
+	state.current_battle->loadMessages(state);
 
 	// Fake battle, remove fake stuff, restore relationships
 	if (state.current_battle->skirmish)
@@ -3082,8 +3111,12 @@ void Battle::exitBattle(GameState &state)
 	// If player has vehicle with bio capacity then all bio loot goes to leftover loot
 	// This is regardless of "enforce limits" which only makes us enforce it
 	// on vehicles that have capacity in the first place
-	bool bioCarrierPresent = false;
-	bool cargoCarrierPresent = false;
+	auto cargoCarrierPresent = false;
+	auto bioCarrierPresent = false;
+	const auto playerHasBaseItemStorage =
+	    isBaseDefenseWithStorage(state, FacilityType::Capacity::Stores);
+	const auto playerHasBaseAlienStorage =
+	    isBaseDefenseWithStorage(state, FacilityType::Capacity::Aliens);
 	for (auto &v : playerVehicles)
 	{
 		if (v->getMaxCargo() > 0)
@@ -3094,8 +3127,12 @@ void Battle::exitBattle(GameState &state)
 		{
 			bioCarrierPresent = true;
 		}
+
+		// If both variables are true, there is no reason to keep going with this loop
+		if (cargoCarrierPresent && bioCarrierPresent)
+			break;
 	}
-	if (!cargoCarrierPresent)
+	if (!cargoCarrierPresent && !playerHasBaseItemStorage)
 	{
 		for (auto &e : state.current_battle->cargoLoot)
 		{
@@ -3107,7 +3144,7 @@ void Battle::exitBattle(GameState &state)
 		}
 		state.current_battle->cargoLoot.clear();
 	}
-	if (!bioCarrierPresent)
+	if (!bioCarrierPresent && !playerHasBaseAlienStorage)
 	{
 		for (auto &e : state.current_battle->bioLoot)
 		{
@@ -3120,39 +3157,81 @@ void Battle::exitBattle(GameState &state)
 	if (!leftoverBioLoot.empty())
 	{
 		// Bio loot is wasted if can't be loaded on player craft
+		LogWarning("Bio loot remaining");
 	}
 
 	// Cargo loot remaining?
-	if (leftoverCargoLoot.empty())
+	if (leftoverCargoLoot.empty() &&
+	    config().getBool("OpenApoc.NewFeature.AllowBuildingLootDeposit"))
 	{
-		if (config().getBool("OpenApoc.NewFeature.AllowBuildingLootDeposit"))
+		if (state.current_battle->mission_type == Battle::MissionType::UfoRecovery)
 		{
-			if (state.current_battle->mission_type == Battle::MissionType::UfoRecovery)
+			// Still can't do anything if we're recovering UFO
+			LogWarning("AllowBuildingLootDeposit and UfoRecovery mission type");
+		}
+		else
+		{
+			// Deposit loot into building, call for pickup
+			StateRef<Building> location = {&state, state.current_battle->mission_location_id};
+			auto homeBuilding =
+			    playerVehicles.empty() ? nullptr : playerVehicles.front()->homeBuilding;
+			if (!homeBuilding)
 			{
-				// Still can't do anything if we're recovering UFO
+				homeBuilding = state.player_bases.begin()->second->building;
 			}
-			else
+
+			// Main loop only starts with leftoverCargoLoot.empty()
+			// This means that the following inner loop will NEVER be executed!
+			// TODO: check if this can be removed
+			for (auto &e : leftoverCargoLoot)
 			{
-				// Deposit loot into building, call for pickup
-				StateRef<Building> location = {&state, state.current_battle->mission_location_id};
-				auto homeBuilding =
-				    playerVehicles.empty() ? nullptr : playerVehicles.front()->homeBuilding;
-				if (!homeBuilding)
-				{
-					homeBuilding = state.player_bases.begin()->second->building;
-				}
-				for (auto &e : leftoverCargoLoot)
-				{
-					int price = 0;
-					location->cargo.emplace_back(state, e.first, e.second, price, nullptr,
-					                             homeBuilding);
-				}
-				for (auto &e : leftoverVehicleLoot)
-				{
-					int price = 0;
-					location->cargo.emplace_back(state, e.first, e.second, price, nullptr,
-					                             homeBuilding);
-				}
+				int price = 0;
+				location->cargo.emplace_back(state, e.first, e.second, price, nullptr,
+				                             homeBuilding);
+			}
+			for (auto &e : leftoverVehicleLoot)
+			{
+				int price = 0;
+				location->cargo.emplace_back(state, e.first, e.second, price, nullptr,
+				                             homeBuilding);
+			}
+		}
+	}
+
+	// Base defense missions only check for vehicles if no storage is available
+	// Items saved in this condition must NOT be saved again into vehicles!
+	if (state.current_battle->mission_type == Battle::MissionType::BaseDefense)
+	{
+		const auto defendedBase = getCurrentDefendedBase(state);
+
+		const auto lootTypeList = {
+		    std::tuple(FacilityType::Capacity::Stores, &state.current_battle->cargoLoot,
+		               &defendedBase->inventoryAgentEquipment),
+		    std::tuple(FacilityType::Capacity::Aliens, &state.current_battle->bioLoot,
+		               &defendedBase->inventoryBioEquipment)};
+
+		for (const auto &lootType : lootTypeList)
+		{
+			const auto facilityTypeEnum = std::get<0>(lootType);
+			auto &lootList = *std::get<1>(lootType);
+			auto &inventoryEquipment = *std::get<2>(lootType);
+
+			if (!isBaseDefenseWithStorage(state, facilityTypeEnum))
+				continue;
+
+			std::list<StateRef<AEquipmentType>> lootToRemove = {};
+
+			for (const auto &loot : lootList)
+			{
+				if (loot.second > 0)
+					inventoryEquipment[loot.first.id] += loot.second;
+
+				lootToRemove.push_back(loot.first);
+			}
+
+			for (const auto &loot : lootToRemove)
+			{
+				lootList.erase(loot);
 			}
 		}
 	}
@@ -3339,7 +3418,7 @@ void Battle::exitBattle(GameState &state)
 	}
 
 	// Give player vehicle a null cargo just so it comes back to base once
-	for (auto v : returningVehicles)
+	for (auto &v : playerVehicles)
 	{
 		v->cargo.emplace_front(
 		    state, StateRef<AEquipmentType>(&state, state.agent_equipment.begin()->first), 0, 0,
@@ -3451,6 +3530,38 @@ void Battle::exitBattle(GameState &state)
 
 	// Remove all dead vehicles from the state
 	state.cleanUpDeathNote();
+}
+
+sp<Base> Battle::getCurrentDefendedBase(GameState &state)
+{
+	if (state.current_battle->mission_type != Battle::MissionType::BaseDefense)
+		return {};
+
+	for (const auto &base : state.player_bases)
+	{
+		if (base.first == state.current_base.id)
+			return base.second;
+	}
+
+	return {};
+}
+
+bool Battle::isBaseDefenseWithStorage(GameState &state, const FacilityType::Capacity capacityType)
+{
+	// Check if mission is base defense, and defended base has alien containment facility to store
+	// live aliens from battle
+	if (state.current_battle->mission_type != Battle::MissionType::BaseDefense)
+		return false;
+
+	const auto defendedBase = getCurrentDefendedBase(state);
+
+	// If base not found
+	if (!defendedBase)
+		return false;
+
+	const auto availableStorageAtBase = defendedBase->getCapacityTotal(capacityType) > 0;
+
+	return availableStorageAtBase;
 }
 
 void Battle::loadResources(GameState &state)
@@ -3710,6 +3821,32 @@ void Battle::unloadAnimationPacks(GameState &state)
 {
 	state.battle_unit_animation_packs.clear();
 	LogInfo("Unloaded all animation packs.");
+}
+
+void Battle::saveMessages(GameState &state)
+{
+	if (!state.messages.empty())
+	{
+		state.cityMessages.clear();
+		for (auto &m : state.messages)
+		{
+			state.cityMessages.push_back(m);
+		}
+		state.messages.clear();
+	}
+}
+
+void Battle::loadMessages(GameState &state)
+{
+	state.messages.clear();
+	if (!state.cityMessages.empty())
+	{
+		for (auto &m : state.cityMessages)
+		{
+			state.messages.push_back(m);
+		}
+		state.cityMessages.clear();
+	}
 }
 
 int BattleScore::getLeadershipBonus()

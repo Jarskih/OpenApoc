@@ -88,6 +88,8 @@ class Building : public StateObject<Building>, public std::enable_shared_from_th
 	StateRef<ResearchTopic> accessTopic;
 	// Victory when successful at raiding this
 	bool victory = false;
+	// Initial alien building
+	bool initialInfiltration = false;
 
 	// may fire a 'commence investigation' event
 	void decreasePendingInvestigatorCount(GameState &state);
@@ -108,6 +110,7 @@ class Building : public StateObject<Building>, public std::enable_shared_from_th
 	void buildingPartChange(GameState &state, Vec3<int> part, bool intact);
 	int getAverageConstitution() const;
 	bool isAlive() const;
+	bool occupied() const;
 
 	// Following members are not serialized, but rather are set in City::initCity method
 

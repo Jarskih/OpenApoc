@@ -138,6 +138,7 @@
 		<member>improvementPercentagePsi</member>
 		<member>canTrain</member>
 		<member>playable</member>
+		<member>availableAtTheGameStart</member>
 		<member>allowsDirectControl</member>
 		<member>aiType</member>
 		<member>immuneToFatalWounds</member>
@@ -244,7 +245,7 @@
 		<member>trainingPsiTicksAccumulated</member>
 		<member>trainingAssignment</member>
 		<member>recentlyHired</member>
-		<member>recentryTransferred</member>
+		<member>recentlyTransferred</member>
 		<member>recentlyFought</member>
 		<member>healingProgress</member>
 		<member>owner</member>
@@ -262,6 +263,9 @@
 		<member>teleportTicksAccumulated</member>
 		<member>equipment</member>
 		<member>destroyAfterBattle</member>
+		<member>hiredOn</member>
+		<member>killCount</member>
+		<member>missionCount</member>
 	</object>
 	<object>
 		<name>AgentPortrait</name>
@@ -972,8 +976,12 @@
 		<member>researchUnlock</member>
 		<member>cityViewScreenCenter</member>
 		<member>cityViewPageIndex</member>
-		<member>cityViewSelectedVehicles</member>
-		<member>cityViewSelectedAgents</member>
+		<member>cityViewSelectedOwnedVehicles</member>
+		<member>cityViewSelectedOtherVehicles</member>
+		<member>cityViewSelectedSoldiers</member>
+		<member>cityViewSelectedBios</member>
+		<member>cityViewSelectedPhysics</member>
+		<member>cityViewSelectedEngineers</member>
 		<member>cityViewSelectedOrganisation</member>
 		<member>cityViewOrgButtonIndex</member>
 	</object>
@@ -1332,7 +1340,6 @@
 	<object>
 		<name>OrganisationRaid</name>
 		<member>nextRaidTimer</member>
-		<member>attack_vehicle_count</member>
 		<member>attack_vehicle_types</member>
 		<member>neutral_low_manpower</member>
 		<member>neutral_normal</member>

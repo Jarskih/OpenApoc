@@ -9,6 +9,7 @@
 #include "game/state/stateobject.h"
 #include "library/sp.h"
 #include "library/vec.h"
+#include <game/state/city/base.h>
 #include <list>
 #include <map>
 #include <set>
@@ -212,6 +213,10 @@ class Battle : public std::enable_shared_from_this<Battle>
 	void initialMapPartRemoval(GameState &state);
 	void initialMapPartLinkUp();
 
+	// Save and load messages from cityscape
+	void saveMessages(GameState &state);
+	void loadMessages(GameState &state);
+
 	void initialUnitSpawn(GameState &state);
 
 	void setMode(Mode mode);
@@ -346,6 +351,10 @@ class Battle : public std::enable_shared_from_this<Battle>
 	    Vec3<int> origin, Vec3<int> destination, const BattleUnitTileHelper &canEnterTile,
 	    bool approachOnly = false, bool ignoreStaticUnits = false, bool ignoreMovingUnits = true,
 	    bool ignoreAllUnits = false, float *cost = nullptr, float maxCost = 0.0f);
+
+	static sp<Base> getCurrentDefendedBase(GameState &state);
+	static bool isBaseDefenseWithStorage(GameState &state,
+	                                     const FacilityType::Capacity capacityType);
 
   private:
 	void loadResources(GameState &state);

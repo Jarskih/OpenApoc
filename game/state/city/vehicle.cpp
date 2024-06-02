@@ -134,13 +134,14 @@ class FlyingVehicleMover : public VehicleMover
 		if (vehicle.missions.empty() && (int)vehicle.position.z != (int)vehicle.altitude)
 		{
 			auto targetPos = vehicle.position;
+			float diff = std::abs((int)vehicle.position.z - (int)vehicle.altitude);
 			if (vehicle.position.z < (int)vehicle.altitude)
 			{
-				targetPos.z += 1.0f;
+				targetPos.z += diff;
 			}
 			else
 			{
-				targetPos.z -= 1.0f;
+				targetPos.z -= diff;
 			}
 			auto tFrom = vehicle.tileObject->getOwningTile();
 			auto tTo = tFrom->map.getTile(targetPos);
@@ -178,6 +179,11 @@ class FlyingVehicleMover : public VehicleMover
 			case Vehicle::AttackMode::Evasive:
 				dodge = 100;
 				break;
+		}
+		if (not vehicle.missions.empty() &&
+		    vehicle.missions.front().targetBuilding == vehicle.homeBuilding)
+		{
+			return;
 		}
 		if (vehicle.type->aggressiveness > 0 && randBoundsExclusive(state.rng, 0, 100) < dodge)
 		{
@@ -763,29 +769,29 @@ class GroundVehicleMover : public VehicleMover
 								vehicle.goalPosition.z = vehicle.position.z;
 							}
 							else
-							    // If we're on flat surface then first move to midpoint then start
-							    // to
-							    // change Z
-							    if (fromFlat)
-							{
-								vehicle.goalWaypoints.push_back(vehicle.goalPosition);
-								// Add midpoint waypoint at target z level
-								vehicle.goalPosition.x =
-								    (vehicle.position.x + vehicle.goalPosition.x) / 2.0f;
-								vehicle.goalPosition.y =
-								    (vehicle.position.y + vehicle.goalPosition.y) / 2.0f;
-								vehicle.goalPosition.z = vehicle.position.z;
-							}
-							// Else if we end on flat surface first change Z then move flat
-							else if (toFlat)
-							{
-								vehicle.goalWaypoints.push_back(vehicle.goalPosition);
-								// Add midpoint waypoint at current z level
-								vehicle.goalPosition.x =
-								    (vehicle.position.x + vehicle.goalPosition.x) / 2.0f;
-								vehicle.goalPosition.y =
-								    (vehicle.position.y + vehicle.goalPosition.y) / 2.0f;
-							}
+								// If we're on flat surface then first move to midpoint then start
+								// to
+								// change Z
+								if (fromFlat)
+								{
+									vehicle.goalWaypoints.push_back(vehicle.goalPosition);
+									// Add midpoint waypoint at target z level
+									vehicle.goalPosition.x =
+									    (vehicle.position.x + vehicle.goalPosition.x) / 2.0f;
+									vehicle.goalPosition.y =
+									    (vehicle.position.y + vehicle.goalPosition.y) / 2.0f;
+									vehicle.goalPosition.z = vehicle.position.z;
+								}
+								// Else if we end on flat surface first change Z then move flat
+								else if (toFlat)
+								{
+									vehicle.goalWaypoints.push_back(vehicle.goalPosition);
+									// Add midpoint waypoint at current z level
+									vehicle.goalPosition.x =
+									    (vehicle.position.x + vehicle.goalPosition.x) / 2.0f;
+									vehicle.goalPosition.y =
+									    (vehicle.position.y + vehicle.goalPosition.y) / 2.0f;
+								}
 							// If we're moving from nonflat to nonflat then we need no midpoint at
 							// all
 						}
@@ -1458,9 +1464,12 @@ void Vehicle::processRecoveredVehicle(GameState &state)
 	std::list<sp<VEquipment>> scrappedEquipment;
 	for (auto &e : equipment)
 	{
-		if (randBoundsExclusive(state.rng, 0, 100) >= FV_CHANCE_TO_RECOVER_EQUIPMENT)
+		if (!moduleInUse(e))
 		{
-			scrappedEquipment.push_back(e);
+			if (randBoundsExclusive(state.rng, 0, 100) >= FV_CHANCE_TO_RECOVER_EQUIPMENT)
+			{
+				scrappedEquipment.push_back(e);
+			}
 		}
 	}
 	for (auto &e : scrappedEquipment)
@@ -1476,6 +1485,13 @@ void Vehicle::processRecoveredVehicle(GameState &state)
 		{
 			auto &economy = state.economy[e->type->ammo_type.id];
 			owner->balance += e->ammo * economy.currentPrice * FV_SCRAPPED_COST_PERCENT / 100;
+		}
+		if (owner == state.getPlayer())
+		{
+			fw().pushEvent(new GameSomethingDiedEvent(
+			    GameEventType::VehicleModuleScrapped,
+			    format("%s - %s", getFormattedVehicleNameForEventMessage(state), e->type->name),
+			    position));
 		}
 	}
 	if (randBoundsExclusive(state.rng, 0, 100) > FV_CHANCE_TO_RECOVER_VEHICLE)
@@ -1526,8 +1542,9 @@ void Vehicle::processRecoveredVehicle(GameState &state)
 		owner->balance += price * FV_SCRAPPED_COST_PERCENT / 100;
 		if (owner == state.getPlayer())
 		{
-			fw().pushEvent(
-			    new GameSomethingDiedEvent(GameEventType::VehicleRecovered, name, "", position));
+			fw().pushEvent(new GameSomethingDiedEvent(GameEventType::VehicleRecovered,
+			                                          getFormattedVehicleNameForEventMessage(state),
+			                                          "", position));
 		}
 		die(state, true);
 	}
@@ -1633,7 +1650,10 @@ void Vehicle::provideServiceCargo(GameState &state, bool bio, bool otherOrg)
 			continue;
 		}
 		// How much can we pick up
-		int maxAmount = std::min(spaceRemaining / c.space * c.divisor, c.count);
+		int maxAmount = (!config().getBool("OpenApoc.NewFeature.EnforceCargoLimits") &&
+		                 this->owner == state.getPlayer())
+		                    ? c.count
+		                    : std::min(spaceRemaining / c.space * c.divisor, c.count);
 		if (maxAmount == 0)
 		{
 			continue;
@@ -1870,8 +1890,9 @@ void Vehicle::die(GameState &state, bool silent, StateRef<Vehicle> attacker)
 
 	if (!silent && city == state.current_city)
 	{
-		fw().pushEvent(new GameSomethingDiedEvent(GameEventType::VehicleDestroyed, name,
-		                                          attacker ? attacker->name : "", position));
+		fw().pushEvent(new GameSomethingDiedEvent(
+		    GameEventType::VehicleDestroyed, getFormattedVehicleNameForEventMessage(state),
+		    attacker ? attacker->getFormattedVehicleNameForEventMessage(state) : "", position));
 	}
 	state.vehiclesDeathNote.insert(id);
 }
@@ -2016,6 +2037,19 @@ void Vehicle::adjustRelationshipOnDowned(GameState &state, StateRef<Vehicle> att
 }
 
 bool Vehicle::isDead() const { return health <= 0; }
+
+bool Vehicle::canDefend() const
+{
+	bool hasWeapons = false;
+	for (auto &e : this->equipment)
+	{
+		if (e->type->type == EquipmentSlotType::VehicleWeapon)
+		{
+			hasWeapons = true;
+		}
+	}
+	return hasWeapons;
+}
 
 Vec3<float> Vehicle::getMuzzleLocation() const
 {
@@ -2288,8 +2322,9 @@ void Vehicle::updateEachSecond(GameState &state)
 					{
 						if (owner == state.getPlayer())
 						{
-							fw().pushEvent(new GameSomethingDiedEvent(GameEventType::VehicleNoFuel,
-							                                          name, "", position));
+							fw().pushEvent(new GameSomethingDiedEvent(
+							    GameEventType::VehicleNoFuel,
+							    getFormattedVehicleNameForEventMessage(state), "", position));
 						}
 						die(state, true);
 					}
@@ -3636,9 +3671,11 @@ sp<VEquipment> Vehicle::addEquipment(GameState &state, Vec2<int> pos,
 	{
 		case EquipmentSlotType::VehicleEngine:
 		{
+			auto thisRef = StateRef<Vehicle>(&state, shared_from_this());
 			auto engine = mksp<VEquipment>();
 			engine->type = equipmentType;
 			this->equipment.emplace_back(engine);
+			engine->owner = thisRef;
 			engine->equippedPosition = slotOrigin;
 			LogInfo("Equipped \"%s\" with engine \"%s\"", this->name, equipmentType->name);
 			return engine;
@@ -3754,6 +3791,21 @@ void Vehicle::nextFrame(int ticks)
 	}
 }
 
+bool Vehicle::moduleInUse(sp<VEquipment> &e)
+{
+	if (e->type->passengers &&
+	    this->getPassengers() > (this->getMaxPassengers() - e->type->passengers))
+	{
+		return true;
+	}
+	if (e->type->cargo_space && this->getCargo() > 0)
+	{
+		return true;
+	}
+
+	return false;
+}
+
 template <> sp<Vehicle> StateObject<Vehicle>::get(const GameState &state, const UString &id)
 {
 	auto it = state.vehicles.find(id);
@@ -3802,6 +3854,15 @@ std::list<std::pair<Vec2<int>, sp<Equipment>>> Vehicle::getEquipment() const
 	}
 
 	return equipmentList;
+}
+
+const UString Vehicle::getFormattedVehicleNameForEventMessage(GameState &state) const
+{
+	if (config().getBool("OpenApoc.NewFeature.ShowNonXCOMVehiclesPrefix") &&
+	    owner != state.getPlayer())
+		return format("%s %s", tr("*"), name);
+
+	return name;
 }
 
 Cargo::Cargo(GameState &state, StateRef<AEquipmentType> equipment, int count, int price,

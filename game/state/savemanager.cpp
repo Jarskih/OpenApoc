@@ -45,15 +45,17 @@ std::shared_future<void> SaveManager::loadGame(const SaveMetadata &metadata,
 std::shared_future<void> SaveManager::loadGame(const UString &savePath, sp<GameState> state) const
 {
 	UString saveArchiveLocation = savePath;
-	auto loadTask = fw().threadPoolEnqueue([saveArchiveLocation, state]() -> void {
-		if (!state->loadGame(saveArchiveLocation))
-		{
-			LogError("Failed to load '%s'", saveArchiveLocation);
-			return;
-		}
-		state->initState();
-		return;
-	});
+	auto loadTask = fw().threadPoolEnqueue(
+	    [saveArchiveLocation, state]() -> void
+	    {
+		    if (!state->loadGame(saveArchiveLocation))
+		    {
+			    LogError("Failed to load '%s'", saveArchiveLocation);
+			    return;
+		    }
+		    state->initState();
+		    return;
+	    });
 
 	return loadTask;
 }
@@ -161,23 +163,25 @@ bool writeArchiveWithBackup(SerializationArchive *archive, const UString &path, 
 
 bool SaveManager::findFreePath(UString &path, const UString &name) const
 {
-	path = createSavePath("save_" + name);
-	if (fs::exists(path))
-	{
-		for (int retries = 5; retries > 0; retries--)
-		{
-			path = createSavePath("save_" + name + std::to_string(rand()));
-			if (!fs::exists(path))
-			{
-				return true;
-			}
-		}
+	path = createSavePath(name);
+	const auto pathExists = fs::exists(path);
 
-		LogError("Unable to generate filename for save %s", name);
-		return false;
+	return !pathExists;
+}
+
+std::optional<SaveMetadata> SaveManager::getSaveGameIfExists(const UString &name) const
+{
+	const auto saveList = getSaveList();
+	const auto it =
+	    std::find_if(saveList.begin(), saveList.end(),
+	                 [&name](const SaveMetadata &obj) { return obj.getName() == name; });
+
+	if (it != saveList.end())
+	{
+		return *it;
 	}
 
-	return true;
+	return {};
 }
 
 bool SaveManager::newSaveGame(const UString &name, const sp<GameState> gameState) const
@@ -297,9 +301,9 @@ std::vector<SaveMetadata> SaveManager::getSaveList() const
 		LogError("Error while enumerating directory: \"%s\"", er.what());
 	}
 
-	sort(saveList.begin(), saveList.end(), [](const SaveMetadata &lhs, const SaveMetadata &rhs) {
-		return lhs.getCreationDate() > rhs.getCreationDate();
-	});
+	sort(saveList.begin(), saveList.end(),
+	     [](const SaveMetadata &lhs, const SaveMetadata &rhs)
+	     { return lhs.getCreationDate() > rhs.getCreationDate(); });
 
 	return saveList;
 }

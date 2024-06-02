@@ -148,7 +148,8 @@ void BuyAndSellScreen::closeScreen()
 		for (auto &b : state->player_bases)
 		{
 			if ((vecChanged[i] || forceLimits) && vecCargoDelta[i] > 0 &&
-			    b.second->getUsage(*state, FacilityType::Capacity::Stores, vecCargoDelta[i]) > 100)
+			    b.second->getUsage(*state, FacilityType::Capacity::Stores, vecCargoDelta[i]) >
+			        100.f)
 			{
 				bad_base = b.second->building->base;
 				break;
@@ -462,7 +463,7 @@ void BuyAndSellScreen::executeOrders()
 							case TransactionControl::Type::AgentEquipmentBio:
 							{
 								// kill aliens
-								b.second->inventoryAgentEquipment[c->itemId] -= order;
+								b.second->inventoryBioEquipment[c->itemId] -= order;
 								break;
 							}
 							case TransactionControl::Type::AgentEquipmentCargo:

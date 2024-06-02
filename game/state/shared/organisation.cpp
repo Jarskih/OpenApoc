@@ -14,7 +14,7 @@
 #include "library/strings.h"
 
 // Uncomment to turn off org missions
-//#define DEBUG_TURN_OFF_ORG_MISSIONS
+// #define DEBUG_TURN_OFF_ORG_MISSIONS
 
 namespace OpenApoc
 {
@@ -519,7 +519,7 @@ void Organisation::updateHirableAgents(GameState &state)
 		return;
 	}
 	StateRef<Building> hireeLocation;
-	if (state.getCivilian().id == id)
+	if (state.getCivilian().id == this->id)
 	{
 		std::vector<StateRef<Building>> buildingsWithoutBases;
 		for (auto &b : state.cities["CITYMAP_HUMAN"]->buildings)
@@ -537,6 +537,7 @@ void Organisation::updateHirableAgents(GameState &state)
 	{
 		if (buildings.empty())
 		{
+			LogDebug("Organization %s has no buildings. No agents generated.", this->name);
 			return;
 		}
 		hireeLocation = pickRandom(state.rng, buildings);
@@ -544,7 +545,7 @@ void Organisation::updateHirableAgents(GameState &state)
 	std::set<sp<Agent>> agentsToRemove;
 	for (auto &a : state.agents)
 	{
-		if (a.second->owner.id == id &&
+		if (a.second->owner.id == this->id &&
 		    hirableAgentTypes.find(a.second->type) != hirableAgentTypes.end())
 		{
 			if (randBoundsExclusive(state.rng, 0, 100) < CHANGE_HIREE_GONE)
@@ -560,8 +561,30 @@ void Organisation::updateHirableAgents(GameState &state)
 	}
 	for (auto &entry : hirableAgentTypes)
 	{
-		int newAgents = randBoundsInclusive(state.rng, entry.second.first, entry.second.second);
-		for (int i = 0; i < newAgents; i++)
+		int newAgentsCount{0};
+		auto orgRelationToPlayer = this->isRelatedTo(state.getPlayer());
+		if (orgRelationToPlayer != Relation::Hostile)
+		{
+			const float relationToXcom = this->getRelationTo(state.getPlayer());
+			float chanceForNewAgent{0.0f};
+			if (relationToXcom < 0.0f)
+			{
+				chanceForNewAgent = (50.0f + relationToXcom) * 0.5f;
+			}
+			else
+			{
+				chanceForNewAgent = 25.0f + relationToXcom;
+			}
+			for (int i = 0; i < entry.second.second; i++)
+			{
+				const auto versusRoll = static_cast<float>(randBoundsInclusive(state.rng, 0, 100));
+				if (versusRoll <= chanceForNewAgent)
+				{
+					newAgentsCount++;
+				}
+			}
+		}
+		for (int i = 0; i < newAgentsCount; i++)
 		{
 			auto a = state.agent_generator.createAgent(state, {&state, id}, entry.first);
 			// Strip them of default equipment
@@ -1074,7 +1097,14 @@ void Organisation::RaidMission::execute(GameState &state, StateRef<City> city,
 			}
 
 			StateRef<Vehicle> firstVehicleSent;
-			int requiredVehicleCount = state.organisation_raid_rules.attack_vehicle_count;
+
+			int requiredVehicleCount =
+			    (owner->buildings.size() + availableVehicles.size() - 1) / owner->buildings.size();
+
+			if (requiredVehicleCount > state.organisation_raid_rules.max_attack_vehicles)
+			{
+				requiredVehicleCount = state.organisation_raid_rules.max_attack_vehicles;
+			}
 
 			// Send vehicles on mission
 			for (auto &type : state.organisation_raid_rules.attack_vehicle_types)
@@ -1160,6 +1190,7 @@ void Organisation::RecurringMission::execute(GameState &state, StateRef<City> ci
 		}
 		// Make list of functional spaceports
 		std::list<StateRef<Building>> spaceports;
+		std::list<sp<Vehicle>> linerList;
 		for (auto &b : city->spaceports)
 		{
 			if (b->isAlive())
@@ -1178,9 +1209,26 @@ void Organisation::RecurringMission::execute(GameState &state, StateRef<City> ci
 				{
 					spaceports.push_back(b);
 				}
+				for (auto &v : b->currentVehicles)
+				{
+					if (pattern.allowedTypes.find(v->type) != pattern.allowedTypes.end())
+					{
+						linerList.push_back(v);
+					}
+				}
 			}
 		}
 		if (spaceports.empty())
+		{
+			return;
+		}
+		/* FIXME:
+		 *  This limits the total number of space liners that can be
+		 *  sent from space. This should be removed when the proper economy
+		 *  is working as this would limit the amount of raw materials that
+		 *  come into the city.
+		 */
+		if (linerList.size() > maxLiners)
 		{
 			return;
 		}
