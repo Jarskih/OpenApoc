@@ -85,6 +85,9 @@ class Agent : public StateObject<Agent>,
 	bool overEncumbred = false;
 	Rank rank = Rank::Rookie;
 	AgentStatus status = AgentStatus::Alive;
+	GameTime hiredOn;
+	unsigned int missionCount = 0;
+	unsigned int killCount = 0;
 
 	unsigned int teleportTicksAccumulated = 0;
 	bool canTeleport() const;
@@ -96,7 +99,7 @@ class Agent : public StateObject<Agent>,
 	TrainingAssignment trainingAssignment = TrainingAssignment::None;
 
 	bool recentlyHired = false;
-	bool recentryTransferred = false;
+	bool recentlyTransferred = false;
 	bool recentlyFought = false;
 	float healingProgress = 0.0f;
 
@@ -233,6 +236,14 @@ class Agent : public StateObject<Agent>,
 	sp<AEquipment> leftHandItem;  // Left hand item, frequently accessed so will be stored here
 	sp<AEquipment> rightHandItem; // Right hand item, frequently accessed so will be stored here
 
+	unsigned int getDaysInService(const GameState &state) const;
+	unsigned int getKills() const;
+	unsigned int getMissions() const;
+	unsigned int getMedalTier() const;
+
+	void incrementMissionCount();
+	void incrementKillCount();
+
 	void destroy() override;
 };
 
@@ -244,6 +255,9 @@ class AgentGenerator
 	std::map<AgentType::Gender, std::list<UString>> first_names;
 	std::list<UString> second_names;
 
+	// Create an agent of specified role available at the beginning of the game
+	StateRef<Agent> createInitAgent(GameState &state, StateRef<Organisation> org,
+	                                AgentType::Role role) const;
 	// Create an agent of specified role
 	StateRef<Agent> createAgent(GameState &state, StateRef<Organisation> org,
 	                            AgentType::Role role) const;

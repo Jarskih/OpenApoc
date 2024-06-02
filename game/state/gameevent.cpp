@@ -33,6 +33,7 @@ const std::map<GameEventType, UString> GameEvent::optionsMap = {
     {GameEventType::NotEnoughFuel, "Notifications.City.NotEnoughFuel"},
     {GameEventType::CommenceInvestigation, "Notifications.City.CommenceInvestigation"},
     {GameEventType::UnauthorizedVehicle, "Notifications.City.UnauthorizedVehicle"},
+    {GameEventType::BaseDestroyed, "Notifications.City.BaseDestroyed"},
 
     {GameEventType::HostileSpotted, "Notifications.Battle.HostileSpotted"},
     {GameEventType::HostileDied, "Notifications.Battle.HostileDied"},
@@ -391,8 +392,7 @@ GameSomethingDiedEvent::GameSomethingDiedEvent(GameEventType type, UString name,
 		case GameEventType::VehicleDestroyed:
 			if (actor.length() > 0)
 			{
-				messageInner = format("%s %s %s: %s", tr("Vehicle destroyed:"), name,
-				                      tr("destroyed by"), actor);
+				messageInner = format("%s %s: %s", name, tr("destroyed by"), actor);
 			}
 			else
 			{
@@ -405,6 +405,9 @@ GameSomethingDiedEvent::GameSomethingDiedEvent(GameEventType type, UString name,
 			break;
 		case GameEventType::VehicleNoFuel:
 			messageInner = format("%s %s", tr("Vehicle out of fuel:"), name);
+			break;
+		case GameEventType::VehicleModuleScrapped:
+			messageInner = format("%s %s", tr("Module lost during recovery:"), name);
 			break;
 		default:
 			LogWarning("GameSomethingDiedEvent %s called on non-death event %d", name,

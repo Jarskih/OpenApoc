@@ -59,6 +59,18 @@ template <> const UString &StateObject<Agent>::getId(const GameState &state, con
 	return emptyString;
 }
 
+StateRef<Agent> AgentGenerator::createInitAgent(GameState &state, StateRef<Organisation> org,
+                                                AgentType::Role role) const
+{
+	std::list<sp<AgentType>> types;
+	for (auto &t : state.agent_types)
+		if (t.second->role == role && t.second->playable && t.second->availableAtTheGameStart)
+			types.insert(types.begin(), t.second);
+	auto type = pickRandom(state.rng, types);
+
+	return createAgent(state, org, {&state, AgentType::getId(state, type)});
+}
+
 StateRef<Agent> AgentGenerator::createAgent(GameState &state, StateRef<Organisation> org,
                                             AgentType::Role role) const
 {
@@ -390,6 +402,7 @@ void Agent::hire(GameState &state, StateRef<Building> newHome)
 	owner = newHome->owner;
 	homeBuilding = newHome;
 	recentlyHired = true;
+	hiredOn = state.gameTime;
 	setMission(state, AgentMission::gotoBuilding(state, *this, newHome, false, true));
 }
 
@@ -397,7 +410,7 @@ void Agent::transfer(GameState &state, StateRef<Building> newHome)
 {
 	homeBuilding = newHome;
 	recentlyHired = false;
-	recentryTransferred = true;
+	recentlyTransferred = true;
 	assigned_to_lab = false;
 	setMission(state, AgentMission::gotoBuilding(state, *this, newHome, false, true));
 }
@@ -876,8 +889,23 @@ bool Agent::setMission(GameState &state, AgentMission mission)
 bool Agent::popFinishedMissions(GameState &state)
 {
 	bool popped = false;
-	while (missions.size() > 0 && missions.front().isFinished(state, *this))
+	while (missions.size() > 0)
 	{
+		// Prevent Building Investigator Count < 0
+		if (missions.front().type == AgentMission::MissionType::InvestigateBuilding)
+		{
+			if (!missions.front().isFinished(state, *this, false))
+			{
+				break;
+			}
+		}
+		else
+		{
+			if (!missions.front().isFinished(state, *this))
+			{
+				break;
+			}
+		}
 		LogWarning("Agent %s mission \"%s\" finished", name, missions.front().getName());
 		missions.pop_front();
 		popped = true;
@@ -926,6 +954,11 @@ void Agent::die(GameState &state, bool silent)
 	if (currentVehicle)
 	{
 		currentVehicle->currentAgents.erase(thisRef);
+	}
+	// Remove from building
+	if (currentBuilding)
+	{
+		currentBuilding->currentAgents.erase(thisRef);
 	}
 
 	// Remove from lab
@@ -1048,12 +1081,12 @@ void Agent::updateHourly(GameState &state)
 	// Heal
 	if (modified_stats.health < current_stats.health && !recentlyFought)
 	{
-		int usage = base->getUsage(state, FacilityType::Capacity::Medical);
-		if (usage < 999)
+		auto usage = base->getUsage(state, FacilityType::Capacity::Medical);
+		if (usage < 999.f)
 		{
-			usage = std::max(100, usage);
+			usage = std::max(100.f, usage);
 			// As per Roger Wong's guide, healing is 0.8 points an hour
-			healingProgress += 80.0f / (float)usage;
+			healingProgress += 80.0f / usage;
 			if (healingProgress > 1.0f)
 			{
 				healingProgress -= 1.0f;
@@ -1064,14 +1097,14 @@ void Agent::updateHourly(GameState &state)
 	// Train
 	if (trainingAssignment != TrainingAssignment::None)
 	{
-		int usage = base->getUsage(state, trainingAssignment == TrainingAssignment::Physical
-		                                      ? FacilityType::Capacity::Training
-		                                      : FacilityType::Capacity::Psi);
-		if (usage < 999)
+		auto usage = base->getUsage(state, trainingAssignment == TrainingAssignment::Physical
+		                                       ? FacilityType::Capacity::Training
+		                                       : FacilityType::Capacity::Psi);
+		if (usage < 999.f)
 		{
-			usage = std::max(100, usage);
+			usage = std::max(100.f, usage);
 			// As per Roger Wong's guide
-			float mult = config().getFloat("OpenApoc.Cheat.StatGrowthMultiplier");
+			auto mult = config().getFloat("OpenApoc.Cheat.StatGrowthMultiplier");
 			if (trainingAssignment == TrainingAssignment::Physical)
 			{
 				trainPhysical(state, TICKS_PER_HOUR * 100 / usage * mult);
@@ -1436,5 +1469,20 @@ void Agent::destroy()
 		this->removeEquipment(state, equipment.front());
 	}
 }
+
+unsigned int Agent::getDaysInService(const GameState &state) const
+{
+	return state.gameTime.getDay() - hiredOn.getDay();
+}
+
+unsigned int Agent::getKills() const { return killCount; }
+
+unsigned int Agent::getMissions() const { return missionCount; }
+
+unsigned int Agent::getMedalTier() const { return 0; }
+
+void Agent::incrementMissionCount() { missionCount++; }
+
+void Agent::incrementKillCount() { killCount++; }
 
 } // namespace OpenApoc

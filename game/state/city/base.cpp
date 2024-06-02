@@ -82,6 +82,7 @@ void Base::die(GameState &state, bool collapse)
 	fw().pushEvent(new GameSomethingDiedEvent(
 	    GameEventType::BaseDestroyed, name,
 	    collapse ? /*by collapsing building*/ "" : "byEnemyForces", building->crewQuarters));
+
 	for (auto &b : building->city->buildings)
 	{
 		for (auto &c : b.second->cargo)
@@ -426,6 +427,21 @@ void Base::destroyFacility(GameState &state, Vec2<int> pos)
 	}
 }
 
+bool Base::containmentEmpty(GameState &state)
+{
+	for (auto &f : facilities)
+	{
+		if (f->type->capacityType == FacilityType::Capacity::Aliens)
+		{
+			if (getCapacityUsed(state, f->type->capacityType) != 0)
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 int Base::getCapacityUsed(GameState &state, FacilityType::Capacity type) const
 {
 	int total = 0;
@@ -521,12 +537,17 @@ int Base::getCapacityUsed(GameState &state, FacilityType::Capacity type) const
 			}
 			break;
 		case FacilityType::Capacity::Aliens:
+		{
 			for (auto &e : inventoryBioEquipment)
 			{
+				if (e.second == 0)
+					continue;
+
 				StateRef<AEquipmentType> ae = {&state, e.first};
 				total += ae->store_space * e.second;
 			}
-			break;
+		}
+		break;
 		case FacilityType::Capacity::Nothing:
 			// Nothing needs to be handled
 			break;
@@ -548,38 +569,38 @@ int Base::getCapacityTotal(FacilityType::Capacity type) const
 	return total;
 }
 
-int Base::getUsage(GameState &state, sp<Facility> facility, int delta) const
+float Base::getUsage(GameState &state, const sp<Facility> facility, const int delta) const
 {
-	if (facility->lab)
-	{
-		float usage = 0.0f;
-		if (delta != 0)
-		{
-			LogError("Delta is only supposed to be used with stores, alien containment and LQ!");
-		}
-		if (facility->lab->current_project)
-		{
-			usage = (float)facility->lab->assigned_agents.size();
-			usage /= facility->type->capacityAmount;
-		}
-		return static_cast<int>(ceilf(usage * 100.0f));
-	}
-	else
-	{
+	if (!facility->lab)
 		return getUsage(state, facility->type->capacityType, delta);
+
+	float usage = 0.0f;
+	if (delta != 0)
+	{
+		LogError("Delta is only supposed to be used with stores, alien containment and LQ!");
 	}
+
+	if (facility->lab->current_project)
+	{
+		usage = (float)facility->lab->assigned_agents.size();
+		usage /= facility->type->capacityAmount;
+	}
+
+	return static_cast<float>(ceilf(usage * 100.0f));
 }
 
-int Base::getUsage(GameState &state, FacilityType::Capacity type, int delta) const
+float Base::getUsage(GameState &state, const FacilityType::Capacity type, const int delta) const
 {
-	int used = getCapacityUsed(state, type) + delta;
-	int total = getCapacityTotal(type);
+	const auto used = getCapacityUsed(state, type) + delta;
+	const auto total = getCapacityTotal(type);
 	if (total == 0)
 	{
 		return used > 0 ? 999 : 0;
 	}
 
-	// + total / 2  due to rounding
-	return std::min(999, (100 * used + total / 2) / total);
+	auto usage = (float)used / total * 100;
+	usage = std::min(999.f, usage);
+
+	return usage;
 }
 }; // namespace OpenApoc

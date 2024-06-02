@@ -12,15 +12,16 @@
 #include "framework/renderer.h"
 #include "framework/sound.h"
 #include "library/sp.h"
+#include <iterator>
 
 namespace OpenApoc
 {
 
 Control::Control(bool takesFocus)
     : funcPreRender(nullptr), mouseInside(false), mouseDepressed(false), resolvedLocation(0, 0),
-      Visible(true), isClickable(false), Name("Control"), Location(0, 0), Size(0, 0),
-      SelectionSize(0, 0), BackgroundColour(0, 0, 0, 0), takesFocus(takesFocus), showBounds(false),
-      Enabled(true), canCopy(true),
+      Visible(true), isClickable(false), Removed(false), Name("Control"), Location(0, 0),
+      Size(0, 0), SelectionSize(0, 0), BackgroundColour(0, 0, 0, 0), takesFocus(takesFocus),
+      showBounds(false), Enabled(true), canCopy(true),
       // Tooltip defaults
       ToolTipBackground{128, 128, 128}, ToolTipBorders{
                                             {1, {0, 0, 0}}, {1, {255, 255, 255}}, {1, {0, 0, 0, 0}}}
@@ -99,7 +100,7 @@ bool Control::isPointInsideControlBounds(Event *e, sp<Control> c) const
 
 void Control::eventOccured(Event *e)
 {
-	for (auto ctrlidx = Controls.rbegin(); ctrlidx != Controls.rend(); ctrlidx++)
+	for (auto ctrlidx = Controls.rbegin(); ctrlidx != Controls.rend();)
 	{
 		auto c = *ctrlidx;
 		if (c->Visible && c->Enabled)
@@ -110,16 +111,27 @@ void Control::eventOccured(Event *e)
 				return;
 			}
 		}
+
+		if ((*ctrlidx)->Removed)
+		{
+			c->Removed = false;
+			ctrlidx =
+			    decltype(Controls)::reverse_iterator(Controls.erase(std::prev(ctrlidx.base())));
+		}
+		else
+		{
+			++ctrlidx;
+		}
 	}
 
 	if (e->type() == EVENT_MOUSE_MOVE || e->type() == EVENT_MOUSE_DOWN ||
-	    e->type() == EVENT_MOUSE_UP)
+	    e->type() == EVENT_MOUSE_UP || e->type() == EVENT_MOUSE_SCROLL)
 	{
 		bool newInside = isPointInsideControlBounds(e->mouse().X, e->mouse().Y);
 		// (e->mouse().X >= resolvedLocation.x && e->mouse().X < resolvedLocation.x + Size.x &&
 		// e->mouse().Y >= resolvedLocation.y && e->mouse().Y < resolvedLocation.y + Size.y);
 
-		if (e->type() == EVENT_MOUSE_MOVE)
+		if (e->type() == EVENT_MOUSE_MOVE || e->type() == EVENT_MOUSE_SCROLL)
 		{
 			if (newInside)
 			{
@@ -345,8 +357,24 @@ void Control::eventOccured(Event *e)
 					ypos += textImage->size.y;
 				}
 
-				fw().showToolTip(surface, pos + resolvedLocation -
-				                              Vec2<int>{surface->size.x / 2, surface->size.y});
+				int screenWidth = fw().displayGetWidth();
+
+				Vec2<int> tooltipPos =
+				    pos + resolvedLocation - Vec2<int>{surface->size.x / 2, surface->size.y};
+
+				// Check if the tooltip is off the screen
+				if (tooltipPos.x < 0)
+				{
+					tooltipPos =
+					    Vec2<int>{0, pos.y} + Vec2<int>{0, resolvedLocation.y - surface->size.y};
+				}
+				if (surface->size.x + tooltipPos.x > screenWidth)
+				{
+					tooltipPos = Vec2<int>{screenWidth - surface->size.x, pos.y} +
+					             Vec2<int>{0, resolvedLocation.y - surface->size.y};
+				}
+
+				fw().showToolTip(surface, tooltipPos);
 			}
 		}
 		else if (e->forms().EventFlag == FormEventType::MouseClick ||

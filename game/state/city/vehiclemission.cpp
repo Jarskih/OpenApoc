@@ -927,6 +927,27 @@ Reachability VehicleTargetHelper::isReachableTarget(const Vehicle &v, Vec3<int> 
 	}
 }
 
+Reachability VehicleTargetHelper::isReachableForRecovery(const Vehicle &v, Vec3<int> target)
+{
+
+	auto &map = *v.city->map;
+	auto targetTile = map.getTile(target);
+
+	// Check if target tile has no building parts permanently blocking it
+	for (auto &obj : targetTile->ownedObjects)
+	{
+		if (obj->getType() == TileObject::Type::Scenery)
+		{
+			auto sceneryTile = std::static_pointer_cast<TileObjectScenery>(obj);
+			if (sceneryTile->scenery.lock()->type->isBuildingPart)
+			{
+				return Reachability::BlockedByBuilding;
+			}
+		}
+	}
+	return Reachability::Reachable;
+}
+
 Reachability VehicleTargetHelper::isReachableTargetFlying(const Vehicle &v, Vec3<int> target)
 {
 	auto &map = *v.city->map;
@@ -1016,19 +1037,11 @@ Reachability VehicleTargetHelper::isReachableTargetGround(const Vehicle &v, Vec3
 
 bool VehicleMission::takeOffCheck(GameState &state, Vehicle &v)
 {
-	if (!v.tileObject)
-	{
-		if (v.currentBuilding)
-		{
-			v.addMission(state, VehicleMission::takeOff(v));
-			return true;
-		}
-		else
-		{
-			return false;
-		}
-	}
-	return false;
+	if (v.tileObject || !v.currentBuilding)
+		return false;
+
+	v.addMission(state, VehicleMission::takeOff(v));
+	return true;
 }
 
 bool VehicleMission::teleportCheck(GameState &state, Vehicle &v)
@@ -1129,7 +1142,7 @@ bool VehicleMission::getNextDestination(GameState &state, Vehicle &v, Vec3<float
 							// Bring angle to one of directional alignments
 							int angleToTargetInt = angleToTarget / (float)M_PI * 4.0f + 0.5f;
 							angleToTarget = (float)angleToTargetInt * (float)M_PI / 4.0f;
-							if (destFacing != angleToTarget)
+							if (destFacing != angleToTarget && v.ticksToTurn > 0)
 							{
 								LogWarning("Vehicle %s facing target", v.name);
 								destFacing = angleToTarget;
@@ -1219,7 +1232,7 @@ bool VehicleMission::getNextDestination(GameState &state, Vehicle &v, Vec3<float
 								// Bring angle to one of directional alignments
 								int angleToTargetInt = angleToTarget / (float)M_PI * 4.0f + 0.5f;
 								angleToTarget = (float)angleToTargetInt * (float)M_PI / 4.0f;
-								if (destFacing != angleToTarget)
+								if (destFacing != angleToTarget && v.ticksToTurn > 0)
 								{
 									LogWarning("Vehicle %s facing target", v.name);
 									destFacing = angleToTarget;
@@ -1427,6 +1440,12 @@ void VehicleMission::update(GameState &state, Vehicle &v, unsigned int ticks, bo
 		}
 		case MissionType::InvestigateBuilding:
 		{
+			// prevent double update when vehicle was already at tgt building at time of alert
+			if (v.wasAlreadyAtTgtBuilding)
+			{
+				v.wasAlreadyAtTgtBuilding = false;
+				return;
+			}
 			if (finished && v.owner == state.getPlayer() && v.currentBuilding->detected)
 			{
 				v.currentBuilding->decreasePendingInvestigatorCount(state);
@@ -1965,30 +1984,27 @@ void VehicleMission::start(GameState &state, Vehicle &v)
 		}
 		case MissionType::AttackBuilding:
 		{
-			if (!targetBuilding)
+			if (!targetBuilding && !acquireTargetBuilding(state, v))
 			{
-				if (!acquireTargetBuilding(state, v))
-				{
-					cancelled = true;
-					return;
-				}
+				cancelled = true;
+				return;
 			}
+
 			if (takeOffCheck(state, v))
 			{
 				return;
 			}
-			else
+
+			if (this->currentPlannedPath.empty())
 			{
-				if (this->currentPlannedPath.empty())
-				{
-					std::uniform_int_distribution<int> xPos(targetBuilding->bounds.p0.x - 5,
-					                                        targetBuilding->bounds.p1.x + 5);
-					std::uniform_int_distribution<int> yPos(targetBuilding->bounds.p0.y - 5,
-					                                        targetBuilding->bounds.p1.y + 5);
-					setPathTo(state, v, v.getPreferredPosition(xPos(state.rng), yPos(state.rng)),
-					          getDefaultIterationCount(v));
-				}
+				std::uniform_int_distribution<int> xPos(targetBuilding->bounds.p0.x - 5,
+				                                        targetBuilding->bounds.p1.x + 5);
+				std::uniform_int_distribution<int> yPos(targetBuilding->bounds.p0.y - 5,
+				                                        targetBuilding->bounds.p1.y + 5);
+				setPathTo(state, v, v.getPreferredPosition(xPos(state.rng), yPos(state.rng)),
+				          getDefaultIterationCount(v));
 			}
+
 			return;
 		}
 		case MissionType::Crash:
@@ -2240,8 +2256,11 @@ void VehicleMission::start(GameState &state, Vehicle &v)
 				case 0:
 				{
 					// Vehicle has crashed successfully and we're on top of it
-					if (targetVehicle->crashed &&
-					    (Vec3<int>)v.position == (Vec3<int>)targetVehicle->position)
+					// For now Disregard the Alt Value
+					Vec3<int> rescuerPosition = v.position;
+					Vec3<int> targetPosition = targetVehicle->position;
+					if (targetVehicle->crashed && rescuerPosition.x == targetPosition.x &&
+					    rescuerPosition.y == targetPosition.y)
 					{
 						missionCounter++;
 
@@ -2261,7 +2280,10 @@ void VehicleMission::start(GameState &state, Vehicle &v)
 						// Recovering crashed non-ufo
 						else
 						{
-							if (targetVehicle->homeBuilding)
+							// Check if vehicle a homebuilding, is not within any building and
+							// visible on the map
+							if (targetVehicle->homeBuilding && !targetVehicle->currentBuilding &&
+							    targetVehicle->tileObject)
 							{
 								auto target = targetVehicle;
 								v.addMission(state, VehicleMission::gotoBuilding(
@@ -2668,10 +2690,11 @@ void VehicleMission::setPathTo(GameState &state, Vehicle &v, Vec3<int> target, i
 		// If target was close enough to reach
 		if (maxIterations > (int)distance)
 		{
-			// If told to give up - cancel mission
+			// If told to give up - cancel mission and crash vehicle so recovery can be initiated
 			if (giveUpIfInvalid)
 			{
 				cancelled = true;
+				v.setCrashed(state);
 				return;
 			}
 			// If not told to give up - subtract attempt
@@ -3027,8 +3050,14 @@ void VehicleMission::takePositionNearPortal(GameState &state, Vehicle &v)
 bool VehicleMission::canRecoverVehicle(const GameState &state, const Vehicle &v,
                                        const Vehicle &target)
 {
-	// Ground can't recover
-	if (v.type->isGround())
+	// Non ATV vehicles can't initiate UFO missions
+	if (v.type->type == VehicleType::Type::Road)
+	{
+		return false;
+	}
+	// ATV vehicles can initiate UFO missions (if enabled)
+	if (v.type->type == VehicleType::Type::ATV &&
+	    !config().getBool("OpenApoc.NewFeature.ATVUFOMission"))
 	{
 		return false;
 	}
@@ -3070,8 +3099,8 @@ bool VehicleMission::canRecoverVehicle(const GameState &state, const Vehicle &v,
 		return false;
 	}
 	// Don't attempt to rescue permanently unreachable craft
-	if (VehicleTargetHelper::isReachableTarget(v, target.position) ==
-	    Reachability::BlockedByScenery)
+	if (VehicleTargetHelper::isReachableForRecovery(v, target.position) ==
+	    Reachability::BlockedByBuilding)
 	{
 		return false;
 	}

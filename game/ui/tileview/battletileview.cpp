@@ -616,7 +616,8 @@ void BattleTileView::render()
 						         battle.visibleUnits[battle.currentPlayer].end()))
 						{
 							if (battle.currentPlayer->isRelatedTo(unit->owner) ==
-							    Organisation::Relation::Hostile)
+							        Organisation::Relation::Hostile &&
+							    unit->owner != state.getCivilian())
 							{
 								selectionImageBack = selectedTileFireImageBack;
 								selectionImageFront = selectedTileFireImageFront;
@@ -1195,7 +1196,8 @@ void BattleTileView::render()
 					    Vec3<float>{0.0f, 0.0f,
 					                (u.second->getCurrentHeight() - 4.0f) * 1.5f / 40.0f});
 
-					if (battle.mode == Battle::Mode::TurnBased)
+					if (battle.mode == Battle::Mode::TurnBased &&
+					    u.second->owner != state.getPlayer())
 					{
 						auto &img = tuIndicators[u.second->agent->modified_stats.time_units];
 						r.draw(img, pos + offset + offsetTU -
@@ -1580,7 +1582,8 @@ void BattleTileView::render()
 	{
 		auto font = ui().getFont("smallset");
 		auto cursorPositionString = font->getString(format("Cursor at %s", selectedTilePosition));
-		r.draw(cursorPositionString, {0, 0});
+		int ypos = (config().getBool("OpenApoc.NewFeature.DebugCommandsVisible")) ? 224 : 0;
+		r.draw(cursorPositionString, {0, ypos});
 	}
 }
 

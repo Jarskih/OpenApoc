@@ -310,13 +310,16 @@ static sp<AEquipment> getAutoreloadAmmoType(const AEquipment &weapon)
 		}
 	}
 	// Otherwise find any possible ammo on the agent
-	for (const auto &ammoType : weapon.type->ammo_types)
+	if (!config().getBool("OpenApoc.NewFeature.LoadSameAmmo"))
 	{
-		auto equippedAmmo = weapon.ownerAgent->getFirstItemByType(ammoType);
-		if (equippedAmmo)
+		for (const auto &ammoType : weapon.type->ammo_types)
 		{
-			LogAssert(equippedAmmo->type->type == AEquipmentType::Type::Ammo);
-			return equippedAmmo;
+			auto equippedAmmo = weapon.ownerAgent->getFirstItemByType(ammoType);
+			if (equippedAmmo)
+			{
+				LogAssert(equippedAmmo->type->type == AEquipmentType::Type::Ammo);
+				return equippedAmmo;
+			}
 		}
 	}
 	// No ammo found
@@ -364,8 +367,8 @@ void AEquipment::loadAmmo(GameState &state, sp<AEquipment> ammoItem)
 	// Store the loaded ammo type for autoreload
 	lastLoadedAmmoType = ammoItem->type;
 
-	// If this has ammo then swap
-	if (payloadType)
+	// If this has ammo, swap if clip can't be refilled
+	if (payloadType && (ammoItem->ammo + ammo > payloadType->max_ammo))
 	{
 		auto ejectedType = payloadType;
 		auto ejectedAmmo = ammo;
@@ -377,7 +380,8 @@ void AEquipment::loadAmmo(GameState &state, sp<AEquipment> ammoItem)
 	else
 	{
 		payloadType = ammoItem->type;
-		ammo = ammoItem->ammo;
+		// Fill partial clip
+		ammo = ammoItem->ammo + ammo;
 		// Spend ammo
 		ammoItem->ammo = 0;
 		// Remove item from battle/agent
@@ -870,12 +874,13 @@ void AEquipment::throwItem(GameState &state, Vec3<int> targetPosition, float vel
 	velocityZ *= targetVectorDifference;
 
 	auto bi = state.current_battle->placeItem(state, shared_from_this(), position);
-
-	bi->velocity =
-	    (glm::normalize(Vec3<float>{targetVectorModified.x, targetVectorModified.y, 0.0f}) *
-	         velocityXY +
-	     Vec3<float>{0.0f, 0.0f, velocityZ}) *
-	    VELOCITY_SCALE_BATTLE;
+	// prevent normalizing of 0 vector throwing exception
+	Vec3<float> norm = {0.0f, 0.0f, 0.0f};
+	if (targetVectorModified.x != 0.0f && targetVectorModified.y != 0.0f)
+	{
+		norm = glm::normalize(Vec3<float>{targetVectorModified.x, targetVectorModified.y, 0.0f});
+	}
+	bi->velocity = (norm * velocityXY + Vec3<float>{0.0f, 0.0f, velocityZ}) * VELOCITY_SCALE_BATTLE;
 	bi->falling = true;
 	// 36 / (velocity length) = enough ticks to pass 1 whole tile
 	bi->ownerInvulnerableTicks =

@@ -126,6 +126,11 @@ void CityTileView::eventOccurred(Event *e)
 					DEBUG_SHOW_ALIEN = !DEBUG_SHOW_ALIEN;
 					return;
 				}
+				case SDLK_p:
+				{
+					DEBUG_SHOW_VEHICLE_TARGETS = !DEBUG_SHOW_VEHICLE_TARGETS;
+					return;
+				}
 				case SDLK_F2:
 				{
 					DEBUG_SHOW_ROAD_PATHFINDING = !DEBUG_SHOW_ROAD_PATHFINDING;
@@ -163,7 +168,7 @@ void CityTileView::eventOccurred(Event *e)
 						DEBUG_SHOW_ALIEN_CREW = false;
 						DEBUG_LAYER = -1;
 					}
-					LogWarning("Debug walk type display set to %s", DEBUG_SHOW_MISC_TYPE);
+					LogWarning("Debug walk type display set to %d", DEBUG_SHOW_MISC_TYPE);
 					return;
 				}
 				case SDLK_F5:
@@ -329,9 +334,8 @@ void CityTileView::render()
 			// List of vehicles that require drawing of brackets
 			std::set<sp<Vehicle>> vehiclesToDrawBrackets;
 			std::map<sp<Vehicle>, int> vehiclesBracketsIndex;
-
 			// Go through every selected vehicle and add target to list of bracket draws
-			for (auto &vehicle : state.current_city->cityViewSelectedVehicles)
+			for (auto &vehicle : state.current_city->cityViewSelectedOwnedVehicles)
 			{
 				if (vehicle->owner != state.getPlayer())
 				{
@@ -382,16 +386,18 @@ void CityTileView::render()
 										auto v = std::static_pointer_cast<TileObjectVehicle>(obj)
 										             ->getVehicle();
 
-										if (!state.current_city->cityViewSelectedVehicles.empty())
+										if (!state.current_city->cityViewSelectedOwnedVehicles
+										         .empty())
 										{
 											auto selectedPos = std::find(
-											    state.current_city->cityViewSelectedVehicles
+											    state.current_city->cityViewSelectedOwnedVehicles
 											        .begin(),
-											    state.current_city->cityViewSelectedVehicles.end(),
+											    state.current_city->cityViewSelectedOwnedVehicles
+											        .end(),
 											    v);
 
 											if (selectedPos ==
-											    state.current_city->cityViewSelectedVehicles
+											    state.current_city->cityViewSelectedOwnedVehicles
 											        .begin())
 											{
 												if (v->owner == state.getPlayer())
@@ -401,8 +407,8 @@ void CityTileView::render()
 												}
 											}
 											else if (selectedPos !=
-											         state.current_city->cityViewSelectedVehicles
-											             .end())
+											         state.current_city
+											             ->cityViewSelectedOwnedVehicles.end())
 											{
 												vehiclesToDrawBrackets.insert(v);
 												vehiclesBracketsIndex[v] = 1;
@@ -579,12 +585,12 @@ void CityTileView::render()
 										hostile = state.getPlayer()->isRelatedTo(v->owner) ==
 										          Organisation::Relation::Hostile;
 										bool selected =
-										    std::find(
-										        state.current_city->cityViewSelectedVehicles
-										            .begin(),
-										        state.current_city->cityViewSelectedVehicles.end(),
-										        v) !=
-										    state.current_city->cityViewSelectedVehicles.end();
+										    std::find(state.current_city
+										                  ->cityViewSelectedOwnedVehicles.begin(),
+										              state.current_city
+										                  ->cityViewSelectedOwnedVehicles.end(),
+										              v) !=
+										    state.current_city->cityViewSelectedOwnedVehicles.end();
 
 										if (friendly)
 										{
@@ -710,9 +716,9 @@ void CityTileView::render()
 					continue;
 				}
 				bool selected =
-				    std::find(state.current_city->cityViewSelectedVehicles.begin(),
-				              state.current_city->cityViewSelectedVehicles.end(),
-				              v.second) != state.current_city->cityViewSelectedVehicles.end();
+				    std::find(state.current_city->cityViewSelectedOwnedVehicles.begin(),
+				              state.current_city->cityViewSelectedOwnedVehicles.end(),
+				              v.second) != state.current_city->cityViewSelectedOwnedVehicles.end();
 
 				// Draw those in buildings
 				if (v.second->currentBuilding)
@@ -829,10 +835,10 @@ void CityTileView::render()
 				if (selectionFrameTicksAccumulated / SELECTION_FRAME_ANIMATION_DELAY)
 				{
 					bool selected =
-					    !state.current_city->cityViewSelectedAgents.empty() &&
-					    std::find(state.current_city->cityViewSelectedAgents.begin(),
-					              state.current_city->cityViewSelectedAgents.end(),
-					              a.second) != state.current_city->cityViewSelectedAgents.end();
+					    !state.current_city->cityViewSelectedSoldiers.empty() &&
+					    std::find(state.current_city->cityViewSelectedSoldiers.begin(),
+					              state.current_city->cityViewSelectedSoldiers.end(),
+					              a.second) != state.current_city->cityViewSelectedSoldiers.end();
 					if (selected)
 					{
 						r.draw(selectionImageFriendlySmall,

@@ -1,4 +1,5 @@
 #include "game/ui/general/mainmenu.h"
+#include "creditsmenu.h"
 #include "forms/form.h"
 #include "forms/label.h"
 #include "forms/ui.h"
@@ -57,9 +58,15 @@ void MainMenu::eventOccurred(Event *e)
 
 	if (e->type() == EVENT_FORM_INTERACTION && e->forms().EventFlag == FormEventType::ButtonClick)
 	{
-		if (e->forms().RaisedBy->Name == "BUTTON_OPTIONS")
+		/* Options menu commented out until useful
+		* if (e->forms().RaisedBy->Name == "BUTTON_OPTIONS")
+		*{
+		*	fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<OptionsMenu>()});
+		*	return;
+		} */
+		if (e->forms().RaisedBy->Name == "BUTTON_CREDITS")
 		{
-			fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<OptionsMenu>()});
+			fw().stageQueueCommand({StageCmd::Command::PUSH, mksp<CreditsMenu>()});
 			return;
 		}
 		if (e->forms().RaisedBy->Name == "BUTTON_QUIT")

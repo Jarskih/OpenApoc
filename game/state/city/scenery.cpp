@@ -1641,6 +1641,7 @@ void Scenery::repair(GameState &state)
 	}
 	damaged = false;
 	falling = false;
+	destroyed = false;
 	if (tileObject)
 	{
 		tileObject->removeFromMap();
@@ -1663,6 +1664,10 @@ void Scenery::repair(GameState &state)
 	if (building && !type->commonProperty)
 	{
 		building->buildingPartChange(state, initialPosition, true);
+	}
+	if (this->type && this->type->tile_type == SceneryTileType::TileType::Road)
+	{
+		state.current_city->notifyRoadChange(this->getPosition(), true);
 	}
 	map.clearPathCaches();
 }

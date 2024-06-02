@@ -166,11 +166,12 @@ void TransferScreen::updateBaseHighlight()
 			facilityPic->setVisible(true);
 			facilityPic->setImage(state->facility_types["FACILITYTYPE_LIVING_QUARTERS"]->sprite);
 			form->findControlTyped<Graphic>("FACILITY_SECOND_BAR")->setVisible(true);
-			int usage = second_base->getUsage(*state, FacilityType::Capacity::Quarters, lq2Delta);
+			const auto usage =
+			    second_base->getUsage(*state, FacilityType::Capacity::Quarters, lq2Delta);
 			fillBaseBar(false, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_SECOND_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%d%%", usage));
+			facilityLabel->setText(format("%.f%%", usage));
 			break;
 		}
 		case BaseGraphics::FacilityHighlight::Stores:
@@ -179,11 +180,12 @@ void TransferScreen::updateBaseHighlight()
 			facilityPic->setVisible(true);
 			facilityPic->setImage(state->facility_types["FACILITYTYPE_STORES"]->sprite);
 			form->findControlTyped<Graphic>("FACILITY_SECOND_BAR")->setVisible(true);
-			int usage = second_base->getUsage(*state, FacilityType::Capacity::Stores, cargo2Delta);
+			const auto usage =
+			    second_base->getUsage(*state, FacilityType::Capacity::Stores, cargo2Delta);
 			fillBaseBar(false, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_SECOND_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%d%%", usage));
+			facilityLabel->setText(format("%.f%%", usage));
 			break;
 		}
 		case BaseGraphics::FacilityHighlight::Aliens:
@@ -192,11 +194,12 @@ void TransferScreen::updateBaseHighlight()
 			facilityPic->setVisible(true);
 			facilityPic->setImage(state->facility_types["FACILITYTYPE_ALIEN_CONTAINMENT"]->sprite);
 			form->findControlTyped<Graphic>("FACILITY_SECOND_BAR")->setVisible(true);
-			int usage = second_base->getUsage(*state, FacilityType::Capacity::Aliens, bio2Delta);
+			const auto usage =
+			    second_base->getUsage(*state, FacilityType::Capacity::Aliens, bio2Delta);
 			fillBaseBar(false, usage);
 			auto facilityLabel = form->findControlTyped<Label>("FACILITY_SECOND_TEXT");
 			facilityLabel->setVisible(true);
-			facilityLabel->setText(format("%d%%", usage));
+			facilityLabel->setText(format("%.f%%", usage));
 			break;
 		}
 		default:
@@ -222,13 +225,15 @@ void TransferScreen::displayItem(sp<TransactionControl> control)
 		{
 			RecruitScreen::personnelSheet(*state->agents[control->itemId], formPersonnelStats);
 			formPersonnelStats->setVisible(true);
+			formAgentProfile->setVisible(false);
 			break;
 		}
 		case TransactionControl::Type::Soldier:
 		{
-			AgentSheet(formAgentStats)
+			AgentSheet(formAgentProfile, formAgentStats)
 			    .display(*state->agents[control->itemId], bigUnitRanks, false);
 			formAgentStats->setVisible(true);
+			formAgentProfile->setVisible(true);
 			break;
 		}
 		default:
@@ -298,13 +303,13 @@ void TransferScreen::closeScreen()
 			{
 				crewOverLimit = vecCrewDelta[i] > 0 &&
 				                b.second->getUsage(*state, FacilityType::Capacity::Quarters,
-				                                   vecCrewDelta[i]) > 100;
+				                                   vecCrewDelta[i]) > 100.f;
 				cargoOverLimit = vecCargoDelta[i] > 0 &&
 				                 b.second->getUsage(*state, FacilityType::Capacity::Stores,
-				                                    vecCargoDelta[i]) > 100;
+				                                    vecCargoDelta[i]) > 100.f;
 				alienOverLimit =
 				    vecBioDelta[i] > 0 && b.second->getUsage(*state, FacilityType::Capacity::Aliens,
-				                                             vecBioDelta[i]) > 100;
+				                                             vecBioDelta[i]) > 100.f;
 				if (crewOverLimit || cargoOverLimit || alienOverLimit)
 				{
 					bad_base = b.second->building->base;
@@ -517,22 +522,7 @@ void TransferScreen::executeOrders()
 					case TransactionControl::Type::Soldier:
 					{
 						StateRef<Agent> agent{state.get(), c->itemId};
-						if (agent->homeBuilding != newBase->building)
-						{
-							agent->homeBuilding = newBase->building;
-							if (agent->currentBuilding != agent->homeBuilding ||
-							    (agent->currentVehicle &&
-							     agent->currentVehicle->currentBuilding != agent->homeBuilding))
-							{
-								if (agent->currentVehicle)
-								{
-									agent->enterBuilding(*state,
-									                     agent->currentVehicle->currentBuilding);
-								}
-								agent->setMission(*state,
-								                  AgentMission::gotoBuilding(*state, *agent));
-							}
-						}
+						agent->transfer(*state, newBase->building);
 						break;
 					}
 					case TransactionControl::Type::Vehicle:
@@ -673,25 +663,31 @@ void TransferScreen::initViewSecondBase()
 		view->setImage(viewImage);
 		view->setDepressedImage(viewImage);
 		wp<GraphicButton> weakView(view);
-		view->addCallback(FormEventType::ButtonClick, [this, weakView](FormsEvent *e) {
-			auto base = e->forms().RaisedBy->getData<Base>();
-			if (this->second_base != base)
-			{
-				this->changeSecondBase(base);
-				this->currentSecondView = weakView.lock();
-			}
-		});
-		view->addCallback(FormEventType::MouseEnter, [this](FormsEvent *e) {
-			auto base = e->forms().RaisedBy->getData<Base>();
-			this->textViewSecondBase->setText(base->name);
-			this->textViewSecondBase->setVisible(true);
-			this->textViewSecondBaseStatic->setVisible(false);
-		});
-		view->addCallback(FormEventType::MouseLeave, [this](FormsEvent *) {
-			// this->textViewSecondBase->setText("");
-			this->textViewSecondBase->setVisible(false);
-			this->textViewSecondBaseStatic->setVisible(true);
-		});
+		view->addCallback(FormEventType::ButtonClick,
+		                  [this, weakView](FormsEvent *e)
+		                  {
+			                  auto base = e->forms().RaisedBy->getData<Base>();
+			                  if (this->second_base != base)
+			                  {
+				                  this->changeSecondBase(base);
+				                  this->currentSecondView = weakView.lock();
+			                  }
+		                  });
+		view->addCallback(FormEventType::MouseEnter,
+		                  [this](FormsEvent *e)
+		                  {
+			                  auto base = e->forms().RaisedBy->getData<Base>();
+			                  this->textViewSecondBase->setText(base->name);
+			                  this->textViewSecondBase->setVisible(true);
+			                  this->textViewSecondBaseStatic->setVisible(false);
+		                  });
+		view->addCallback(FormEventType::MouseLeave,
+		                  [this](FormsEvent *)
+		                  {
+			                  // this->textViewSecondBase->setText("");
+			                  this->textViewSecondBase->setVisible(false);
+			                  this->textViewSecondBaseStatic->setVisible(true);
+		                  });
 	}
 	textViewSecondBase = form->findControlTyped<Label>("TEXT_BUTTON_SECOND_BASE");
 	textViewSecondBase->setVisible(false);

@@ -82,7 +82,7 @@ class FrameworkPrivate
 	sp<Surface> scaleSurface;
 	up<ThreadPool> threadPool;
 
-	int toolTipTimerId = 0;
+	std::atomic<int> toolTipTimerId = 0;
 	up<Event> toolTipTimerEvent;
 	sp<Image> toolTipImage;
 	Vec2<int> toolTipPosition;
@@ -465,17 +465,19 @@ void Framework::processEvents()
 					}
 					else
 					{
-						this->threadPoolTaskEnqueue([img, screenshotName] {
-							auto ret = fw().data->writeImage(screenshotName, img);
-							if (!ret)
-							{
-								LogWarning("Failed to write screenshot");
-							}
-							else
-							{
-								LogWarning("Wrote screenshot to \"%s\"", screenshotName);
-							}
-						});
+						this->threadPoolTaskEnqueue(
+						    [img, screenshotName]
+						    {
+							    auto ret = fw().data->writeImage(screenshotName, img);
+							    if (!ret)
+							    {
+								    LogWarning("Failed to write screenshot");
+							    }
+							    else
+							    {
+								    LogWarning("Wrote screenshot to \"%s\"", screenshotName);
+							    }
+						    });
 					}
 				}
 			}
@@ -570,7 +572,7 @@ void Framework::translateSdlEvents()
 				break;
 			case SDL_MOUSEWHEEL:
 				// FIXME: Check these values for sanity
-				fwE = new MouseEvent(EVENT_MOUSE_MOVE);
+				fwE = new MouseEvent(EVENT_MOUSE_SCROLL);
 				// Since I'm using some variables that are not used anywhere else,
 				// this code should be in its own small block.
 				{
@@ -1010,6 +1012,8 @@ void Framework::audioInitialise()
 	p->registeredSoundBackends["SDLRaw"].reset(getSDLSoundBackend());
 	p->registeredSoundBackends["null"].reset(getNullSoundBackend());
 
+	auto concurrent_sample_count = Options::audioConcurrentSampleCount.get();
+
 	for (auto &soundBackendName : split(Options::audioBackendsOption.get(), ":"))
 	{
 		auto backendFactory = p->registeredSoundBackends.find(soundBackendName);
@@ -1018,7 +1022,7 @@ void Framework::audioInitialise()
 			LogInfo("Sound backend %s not in supported list", soundBackendName);
 			continue;
 		}
-		SoundBackend *backend = backendFactory->second->create();
+		SoundBackend *backend = backendFactory->second->create(concurrent_sample_count);
 		if (!backend)
 		{
 			LogInfo("Sound backend %s failed to init", soundBackendName);
@@ -1076,7 +1080,8 @@ void Framework::toolTipStartTimer(up<Event> e)
 	p->toolTipTimerEvent = std::move(e);
 	p->toolTipTimerId = SDL_AddTimer(
 	    delay,
-	    [](unsigned int interval, void *data) -> unsigned int {
+	    [](unsigned int interval, void *data) -> unsigned int
+	    {
 		    fw().toolTipTimerCallback(interval, data);
 		    // remove this sdl timer
 		    return 0;
