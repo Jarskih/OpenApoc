@@ -1594,19 +1594,54 @@ void BattleUnitMission::update(GameState &state, BattleUnit &u, unsigned int tic
 			return;
 		}
 		case Type::ThrowItem:
+			// Check if the item is still owned by the agent attempting to throw it.
+			// If not, cancel the mission. This handles cases where the item might have been
+			// removed via inventory screen mid-throw.
+			if (!item || item->ownerAgent != u.agent)
+			{
+				this->cancelled = true;
+				// Explicitly nullify item here to prevent any lingering references
+				// if the mission is somehow re-evaluated before being popped.
+				this->item = nullptr;
+				// Ensure targetBodyState is reset so unit doesn't get stuck in throwing stance.
+				this->targetBodyState = BodyState::Standing;
+				return;
+			}
+
 			// Half way there - throw the item!
-			if (item && u.current_body_state == BodyState::Throwing &&
+			// Original logic for item release proceeds if item is still valid and animation is ready
+			if (u.current_body_state == BodyState::Throwing &&
 			    u.target_body_state == BodyState::Throwing)
 			{
-				// Ensure item still belongs to agent
+				// Ensure the specific item is still in one of the agent's hands.
+				// If not (e.g. moved to backpack), cancel the throw.
+				if (item->equippedSlotType != EquipmentSlotType::LeftHand &&
+					item->equippedSlotType != EquipmentSlotType::RightHand)
+				{
+					this->cancelled = true;
+					this->item = nullptr;
+					this->targetBodyState = BodyState::Standing;
+					return;
+				}
+
+				// This ownerAgent check is now somewhat redundant due to the top check,
+				// and the hand slot check above, but kept for absolute safety.
 				if (item->ownerAgent == u.agent)
 				{
-					item->ownerAgent->removeEquipment(state, item);
-					item->ownerUnit = {&state, u.id};
-					item->throwItem(state, targetLocation, velocityXY, velocityZ);
+					// Attempt to remove the item. If successful, then throw.
+					// This is the final confirmation that the agent still possesses the item
+					// AND it's being correctly removed from their equipment (implicitly from hand).
+					if (item->ownerAgent->removeEquipment(state, item))
+					{
+						item->ownerUnit = {&state, u.id};
+						item->throwItem(state, targetLocation, velocityXY, velocityZ);
+					}
+					// If removeEquipment failed, item will be nulled and mission ends.
 				}
-				item = nullptr;
-				targetBodyState = BodyState::Standing;
+				// Nullify item after attempting throw, regardless of success,
+				// as the mission's attempt to use this specific item instance is now complete.
+				this->item = nullptr;
+				this->targetBodyState = BodyState::Standing;
 			}
 			return;
 		case Type::ReachGoal:
@@ -1732,7 +1767,9 @@ bool BattleUnitMission::isFinishedInternal(GameState &, BattleUnit &u)
 			return u.target_body_state == u.current_body_state &&
 			       u.current_body_state == targetBodyState;
 		case Type::ThrowItem:
-			return !item && u.current_body_state == BodyState::Standing;
+			// Mission is finished if it was cancelled or if the item has been processed (nulled).
+			// Also ensure the unit is trying to return to a standing state.
+			return cancelled || (!item && targetBodyState == BodyState::Standing && u.current_body_state == BodyState::Standing);
 		case Type::Turn:
 			return u.goalFacing == u.facing && u.facing == targetFacing &&
 			       u.target_body_state == u.current_body_state &&
@@ -1854,7 +1891,10 @@ void BattleUnitMission::start(GameState &state, BattleUnit &u)
 			}
 			if (item)
 			{
-				if (item->ownerAgent)
+				// Ensure item still belongs to agent before attempting to remove
+				// This handles cases where item might have been moved by another system
+				// or if this mission is re-started after item was already processed.
+				if (item->ownerAgent == u.agent)
 				{
 					item->ownerAgent->removeEquipment(state, item);
 				}
@@ -1869,6 +1909,7 @@ void BattleUnitMission::start(GameState &state, BattleUnit &u)
 				                                 : (float)u.getCurrentHeight() / 80.0f});
 				bi->falling = true;
 			}
+			// Ensure item is nulled so isFinished returns true.
 			item = nullptr;
 			return;
 		}
@@ -1877,6 +1918,13 @@ void BattleUnitMission::start(GameState &state, BattleUnit &u)
 			if (!u.agent->type->inventory)
 			{
 				cancelled = true;
+				return;
+			}
+			// Initial check: if the item for the mission is already gone, cancel.
+			// This can happen if the mission is created but the item is removed before start() is called.
+			if (item && item->ownerAgent != u.agent) {
+				cancelled = true;
+				item = nullptr; // Prevent further use
 				return;
 			}
 			return;
